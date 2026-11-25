@@ -105,11 +105,16 @@ function startViewer() {
     if (dimensions) dimensions.textContent=selected+'″ W × 52″ H × 12″ D';
     const pages=document.querySelector('#print-pages');
     if (pages) pages.textContent=selected+'″ · PDF pages '+({18:'1–6',24:'7–12',36:'13–18'}[selected]);
-    for (const a of document.querySelectorAll('#cabinet-film,#fallback-film')) {
+    for (const a of document.querySelectorAll('#cabinet-film,#fallback-film,#download-film')) {
       const film=currentArt().film;
       if (film) {a.href=film;a.dataset.filmWidth=String(selected);}
       else a.removeAttribute('href');
     }
+    const filename = 'Yusuf-Overseas-Green-Cabinet-' + selected + 'in';
+    document.querySelector('#download-film').download = filename + '-4K.mp4';
+    const artworkDownload = document.querySelector('#download-art');
+    artworkDownload.href = './green-cabinet/cabinet-' + selected + '-rear-4k.png';
+    artworkDownload.download = filename + '-Rear-4K.png';
     Object.assign(canvas.dataset,{cabinetWidth:String(selected),cabinetHeight:'52',cabinetDepth:'12'});
     document.dispatchEvent(new CustomEvent('cabinet-size-change',{bubbles:true,detail:{width:selected,depth:12,height:52}}));
   }
