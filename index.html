@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#eeece6">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Original Green Cabinet · Yusuf Overseas</title>
+  <meta property="og:title" content="Original Green Cabinet · Yusuf Overseas">
+  <meta property="og:description" content="Rotate the cabinet in 3D and download the full-size print artwork.">
+  <meta property="og:image" content="https://truuglobal25-hash.github.io/priya-cabinet/cabinet.webp">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; background: #eeece6; }
+    iframe { display: block; width: 100%; height: 100%; height: 100dvh; border: 0; }
+  </style>
+</head>
+<body>
+  <iframe id="cabinet" title="Yusuf Overseas cabinet viewer and print download" allow="fullscreen" allowfullscreen></iframe>
+  <noscript>
+    <style>#cabinet {display:none}</style>
+    <iframe title="Yusuf Overseas cabinet artwork" src="https://priya-green-cabinet.kingusamah.chatgpt.site/?size=36#rear"></iframe>
+  </noscript>
+  <script>
+    const destination = new URL('https://priya-green-cabinet.kingusamah.chatgpt.site/');
+    const width = new URLSearchParams(location.search).get('size');
+    destination.searchParams.set('size', ['18','24','36'].includes(width) ? width : '36');
+    destination.hash = location.hash || 'rear';
+    document.getElementById('cabinet').src = destination.href;
+  </script>
+</body>
+</html>
