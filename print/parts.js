@@ -16,11 +16,24 @@ globalThis.CabinetPrint = (() => {
     return data;
   }
   async function read(base,part) {
-    const response=await fetch(new URL('parts/'+part.sha256+'.bin',base), {cache:'default'});
-    if (!response.ok) throw Error('A print segment could not be downloaded.');
-    const bytes = await response.arrayBuffer();
-    if (bytes.byteLength!==part.bytes || await digest(bytes)!==part.sha256) throw Error('A downloaded print segment failed verification. Please try again.');
-    return bytes;
+    const url = new URL('parts/' + part.sha256 + '.bin', base);
+    const retries = [0, 400, 1200, 3000];
+    let lastError;
+    for (const delay of retries) {
+      if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+      try {
+        const response = await fetch(url, {cache: delay ? 'reload' : 'default'});
+        if (!response.ok) throw Error('A print segment could not be downloaded.');
+        const bytes = await response.arrayBuffer();
+        if (bytes.byteLength !== part.bytes || await digest(bytes) !== part.sha256) {
+          throw Error('A downloaded print segment failed verification. Please try again.');
+        }
+        return bytes;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError;
   }
   function range(value, total) {
     const m=/^bytes=(\d*)-(\d*)$/i.exec(value||'');
