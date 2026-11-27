@@ -74,3 +74,9 @@ body.unavailable .controls button, body.unavailable .controls .group {display:no
   .media-downloads {grid-column:1/-1;margin:0;}
   .media-downloads a {min-height:32px;}
 }
+
+.media-downloads .compact-label {display:none;}
+@media(max-width:600px) {
+  .media-downloads .standard-label {display:none;}
+  .media-downloads .compact-label {display:inline;}
+}

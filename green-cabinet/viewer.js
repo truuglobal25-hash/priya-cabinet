@@ -116,6 +116,9 @@ function startViewer() {
     const artworkDownload = document.querySelector('#download-art');
     artworkDownload.href = './green-cabinet/cabinet-' + selected + '-rear-4k.png?v=b81d3e843c48';
     artworkDownload.download = filename + '-Rear-4K.png';
+    const panels = document.querySelector('#download-panels');
+    panels.href = './4k-panels/?size=' + selected + '&download=1';
+    panels.setAttribute('aria-label', 'Download all six 4K panels for the ' + selected + '-inch cabinet');
     Object.assign(canvas.dataset,{cabinetWidth:String(selected),cabinetHeight:'52',cabinetDepth:'12'});
     document.dispatchEvent(new CustomEvent('cabinet-size-change',{bubbles:true,detail:{width:selected,depth:12,height:52}}));
   }
@@ -132,6 +135,38 @@ function startViewer() {
     if (element.style.clipPath!==clip) element.style.clipPath=clip;
   }
 
+  // Some high-detail crop files are served in small pieces for reliable mobile downloads.
+  const detailBlobs=new Map();
+  async function checkedDetail(url,expected,bytes) {
+    for(let attempt=0;attempt<3;attempt++){
+      try {
+        const response=await fetch(url,{cache:attempt?'reload':'default'});
+        if(!response.ok)throw Error('Could not download cabinet detail.');
+        const data=await response.arrayBuffer();
+        const digest=await crypto.subtle.digest('SHA-256',data);
+        const hex=Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,'0')).join('');
+        if(data.byteLength!==bytes || hex!==expected)throw Error('Cabinet detail checksum failed.');
+        return data;
+      } catch(error) { if(attempt===2)throw error; }
+    }
+  }
+  function detailURL(detail) {
+    if(!detail.parts)return Promise.resolve(detail.image);
+    if(!detailBlobs.has(detail.sha256)){
+      const loading=Promise.all(detail.parts.map(([hash,size])=>
+        checkedDetail('./green-cabinet/detail-parts/'+hash+'.bin',hash,size)
+      )).then(async pieces=>{
+        const image=new Blob(pieces,{type:'image/webp'});
+        const digest=await crypto.subtle.digest('SHA-256',await image.arrayBuffer());
+        const hex=Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,'0')).join('');
+        if(hex!==detail.sha256)throw Error('Cabinet detail checksum failed.');
+        return URL.createObjectURL(image);
+      }).catch(error=>{detailBlobs.delete(detail.sha256);throw error;});
+      detailBlobs.set(detail.sha256,loading);
+    }
+    return detailBlobs.get(detail.sha256);
+  }
+
   function staticDrawing(panel,viewBox) {
     const ns='http://www.w3.org/2000/svg';
     elevation=document.createElementNS(ns,'svg');elevation.id='cabinet-static-art';
@@ -140,12 +175,23 @@ function startViewer() {
     elevation.setAttribute('viewBox',viewBox.join(' '));
     function shape(type,attrs) {
       const element=document.createElementNS(ns,type);
-      Object.entries(attrs).forEach(([k,v])=>element.setAttribute(k,v));elevation.append(element);
+      Object.entries(attrs).forEach(([k,v])=>element.setAttribute(k,v));elevation.append(element);return element;
     }
     function photo(name,x,y,w,h) {
       shape('image',{href:currentArt().images[name],x,y,width:w,height:h,preserveAspectRatio:'none'});
     }
-    if (panel!=='front') photo(panel,0,0,panel==='left'||panel==='right'?12:selected,52);
+    if (panel!=='front') {
+      photo(panel,0,0,panel==='left'||panel==='right'?12:selected,52);
+      const detail=currentArt().details?.[manager.view];
+      if (detail && detail.face===panel) {
+        const [x,y,width,height]=detail.rect;
+        const image=shape('image',{x,y,width,height,preserveAspectRatio:'none'});
+        if(!detail.parts)image.setAttribute('href',detail.image);
+        else detailURL(detail).then(url=>{
+          if(image.isConnected)image.setAttribute('href',url);
+        }).catch(error=>console.warn('Cabinet detail image could not be loaded',error));
+      }
+    }
     else {
       shape('rect',{x:0,y:0,width:selected,height:52,fill:'#dddcd4'});
       shape('rect',{x:.5,y:0,width:selected-1,height:52,fill:'#eeede6'});
@@ -163,11 +209,11 @@ function startViewer() {
     const art=currentArt(),view=manager.view || 'overview';
     const still=art.posters || {};
     const brand={'rear-streax':'streax','rear-powders':'buds'}[view];
-    const close=brand && still[brand]?.[wide.matches?'wide':'portrait'];
+
     const main=canvas.parentElement;
     poster.hidden=false;poster.classList.remove('header-preview');
     poster.style.cssText='';poster.dataset.cabinetWidth=String(selected);poster.dataset.view=view;
-    let photo=close,ratio;
+    let photo,ratio;
     if (!photo && view==='overview') photo=still.overview;
     if (!photo && view==='front') photo=still.front;
     if (!photo && (view==='rear'||view==='overview')) {photo=still.rear || art.images.rear;ratio=selected/52;}
@@ -184,7 +230,9 @@ function startViewer() {
     if (view==='front') return staticDrawing('front',[-.4,-1,selected+.8,54]);
     const rear=brand || (view==='serum'?'wowish':'');
     if (rear) {
-      const [x,y,w,h]=art.stations[rear];return staticDrawing('rear',[x-.3,y-.3,w+.6,h+.6]);
+      const ar=aspect(),pose=viewPose(view,selected,ar,art);
+      const half=overviewHalf(selected,ar)/pose.zoom,halfW=half*ar;
+      return staticDrawing('rear',[selected/2-pose.offsetX-halfW,52-pose.aim-half,2*halfW,2*half]);
     }
     if (view==='soft-shelf') return staticDrawing('right',[-.18,39.85,12.36,9.8]);
     const left=view==='streax'||view==='skincare';
@@ -264,10 +312,17 @@ function startViewer() {
       void main(){vec3 p=pos-target;gl_Position=vec4(dot(p,right)/frame.x,dot(p,up)/frame.y,-dot(p,eye)/150.,1.);tex=uv;normal=norm;point=pos;}`;
     const precision=gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER,gl.HIGH_FLOAT).precision?'highp':'mediump';
     const fragment=`precision ${precision} float;varying vec2 tex;varying vec3 normal,point;
-      uniform sampler2D sheet;uniform float kind,halfWidth;
+      uniform sampler2D sheet,detailSheet;uniform vec4 detailRect;uniform float kind,halfWidth;
       void main(){
         if(kind>2.5){vec2 f=vec2((point.x-1.)/(halfWidth+3.),(point.y-1.)/8.);gl_FragColor=vec4(.25,.24,.19,.20*exp(-1.5*dot(f,f)));return;}
-        if(kind>1.5){gl_FragColor=vec4(texture2D(sheet,tex).rgb*(.985+.015*max(normal.z,0.)),1.);return;}
+        if(kind>1.5){
+          vec3 color=texture2D(sheet,tex).rgb;
+          if(detailRect.z>0.0){
+            vec2 uv=(tex-detailRect.xy)/detailRect.zw;
+            if(all(greaterThanEqual(uv,vec2(0.))) && all(lessThanEqual(uv,vec2(1.))))color=texture2D(detailSheet,uv).rgb;
+          }
+          gl_FragColor=vec4(color*(.985+.015*max(normal.z,0.)),1.);return;
+        }
         float lit=.79+.15*max(0.,dot(normal,normalize(vec3(-.6,-.6,1.))))+.045*normal.z;
         float depth=clamp((point.y+6.)/12.,0.,1.),side=clamp((abs(point.x)-halfWidth+4.)/4.,0.,1.);
         float inner=step(point.y,5.85)*step(abs(point.x),halfWidth-.48)*step(3.,point.z);
@@ -275,23 +330,53 @@ function startViewer() {
         if(normal.y < -.8 && point.y > 5.){float b=min(min(abs(point.z-14.5),abs(point.z-26.)),min(abs(point.z-37.5),abs(point.z-44.)));occlude+=.06*exp(-.65*b);}
         gl_FragColor=vec4(vec3(.969,.963,.940)*(lit-occlude),1.);
       }`;
+    const webgl2=typeof WebGL2RenderingContext!=='undefined' && gl instanceof WebGL2RenderingContext;
     const program=gl.createProgram();
     for (const [type,code] of [[gl.VERTEX_SHADER,vertex],[gl.FRAGMENT_SHADER,fragment]]) {
-      const shader=gl.createShader(type);gl.shaderSource(shader,code);gl.compileShader(shader);
+      const shader=gl.createShader(type);
+      let source=code;
+      if(webgl2){
+        const vertexStage=type===gl.VERTEX_SHADER;
+        source='#version 300 es\n'+code.replace(/\battribute\b/g,'in')
+          .replace(/\bvarying\b/g,vertexStage?'out':'in').replace(/texture2D\(/g,'texture(');
+        if(!vertexStage)source=source.replace('float;','float;out vec4 outColor;').replace(/gl_FragColor/g,'outColor');
+      }
+      gl.shaderSource(shader,source);gl.compileShader(shader);
       if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(shader));
       gl.attachShader(program,shader);gl.deleteShader(shader);
     }
     gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));
     gl.useProgram(program);
-    const u=Object.fromEntries(['right','up','eye','target','frame','sheet','kind','halfWidth'].map(n=>[n,gl.getUniformLocation(program,n)]));
+    const u=Object.fromEntries(['right','up','eye','target','frame','sheet','detailSheet','detailRect','kind','halfWidth'].map(n=>[n,gl.getUniformLocation(program,n)]));
     const attrs=[['pos',3,0],['norm',3,12],['uv',2,24]].map(([key,n,o])=>[gl.getAttribLocation(program,key),n,o]);
     attrs.forEach(([a])=>gl.enableVertexAttribArray(a));
-    gl.uniform1i(u.sheet,0);gl.enable(gl.DEPTH_TEST);gl.enable(gl.CULL_FACE);gl.cullFace(gl.BACK);
+    gl.uniform1i(u.sheet,0);gl.uniform1i(u.detailSheet,1);gl.enable(gl.DEPTH_TEST);gl.enable(gl.CULL_FACE);gl.cullFace(gl.BACK);
     gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.clearColor(0,0,0,0);
     const maximum=gl.getParameter(gl.MAX_TEXTURE_SIZE);
     const af=gl.getExtension('EXT_texture_filter_anisotropic');
     const maxAniso=af?Math.min(8,gl.getParameter(af.MAX_TEXTURE_MAX_ANISOTROPY_EXT)):0;
+    const viewportLimits=gl.getParameter(gl.MAX_VIEWPORT_DIMS);
+    const renderbufferLimit=gl.getParameter(gl.MAX_RENDERBUFFER_SIZE);
     let model=null,objects=new Map(),frame=0,last=0;
+    let detail=null,requestedDetail=null,detailRevision=0;
+    function useDetail(view) {
+      const next=currentArt().details?.[view] || null;
+      if(next===requestedDetail)return;
+      requestedDetail=next;const revision=++detailRevision;
+      if(detail){gl.deleteTexture(detail.texture);detail=null;}
+      delete canvas.dataset.detailTexture;
+      if(!next)return;
+      const width=selected;
+      const isCurrent=()=>revision===detailRevision && selected===width && model?.width===width;
+      detailURL(next).then(url=>isCurrent()?fetchTexture(url,isCurrent):null).then(texture=>{
+        if(!texture)return;
+        if(!isCurrent()){gl.deleteTexture(texture);return;}
+        const [x,y,w,h]=next.rect,faceWidth=next.face==='rear'?width:12;
+        detail={texture,face:next.face,rect:[x/faceWidth,1-(y+h)/52,w/faceWidth,h/52]};
+        canvas.dataset.detailTexture=next.image;
+        invalidate();
+      }).catch(error=>{if(isCurrent())console.warn('Cabinet detail image could not be loaded',error);});
+    }
     async function fetchTexture(url,current) {
       const im=new Image();im.src=url;await im.decode();if(!current())return null;
       let bitmap=im;
@@ -300,11 +385,11 @@ function startViewer() {
         bitmap.width=Math.max(1,Math.round(im.width*factor));bitmap.height=Math.max(1,Math.round(im.height*factor));
         bitmap.getContext('2d').drawImage(im,0,0,bitmap.width,bitmap.height);
       }
-      const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
+      const t=gl.createTexture();gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,t);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
       gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,bitmap);
       gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
       const pot=x=>(x&(x-1))===0;
-      if(pot(bitmap.width)&&pot(bitmap.height)){
+      if(webgl2 || (pot(bitmap.width)&&pot(bitmap.height))){
         gl.generateMipmap(gl.TEXTURE_2D);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);
       }else gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
       if(af)gl.texParameterf(gl.TEXTURE_2D,af.TEXTURE_MAX_ANISOTROPY_EXT,maxAniso);
@@ -312,6 +397,7 @@ function startViewer() {
       return t;
     }
     async function load(width,urls,current) {
+      useDetail('');
       // Keep shared faces resident and release the old-width GPU resources on commit.
       // A superseded or failed load cannot install mixed-width artwork.
       const entries=new Map(),fresh=new Set();
@@ -336,7 +422,11 @@ function startViewer() {
     function draw(key,kind){
       const [buffer,n]=model.buffers[key];gl.uniform1f(u.kind,kind);gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
       attrs.forEach(([a,k,o])=>gl.vertexAttribPointer(a,k,gl.FLOAT,false,32,o));
-      gl.bindTexture(gl.TEXTURE_2D,model.textures[key]||model.textures.lip);
+      const base=model.textures[key]||model.textures.lip;
+      const overlay=detail?.face===key?detail:null;
+      gl.uniform4fv(u.detailRect,overlay?overlay.rect:[0,0,0,0]);
+      gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,overlay?overlay.texture:base);
+      gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,base);
       gl.drawArrays(gl.TRIANGLES,0,n);
     }
     function drawFrame(t) {
@@ -350,7 +440,10 @@ function startViewer() {
       }
       if(m.spinning&&!transitioning)m.yaw+=dt*orbitSpeed;
       clipToShelf(canvas);
-      const dpr=Math.min(window.devicePixelRatio||1,2);
+      // Match the physical display up to a 4096px artwork edge and the GPU's framebuffer limit.
+      const dpr=Math.min(window.devicePixelRatio||1,
+        Math.min(4096,viewportLimits[0],renderbufferLimit)/Math.max(1,canvas.clientWidth),
+        Math.min(4096,viewportLimits[1],renderbufferLimit)/Math.max(1,canvas.clientHeight));
       const w=Math.round(canvas.clientWidth*dpr),h=Math.round(canvas.clientHeight*dpr);if(!w||!h)return;
       if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}
       gl.viewport(0,0,w,h);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
@@ -405,7 +498,7 @@ function startViewer() {
     function stop(){rotationChoice=false;manager.current=null;manager.spinning=false;manager.view='';last=0;update();}
     function view(name,immediate=false) {
       if(!name){update();return;}
-      manager.view=name;applyRotation();
+      manager.view=name;useDetail(name);applyRotation();
       const dest=viewPose(name,selected,aspect(),currentArt());
       dest.yaw=manager.yaw+((dest.yaw-manager.yaw)%360+540)%360-180;
       if(immediate||reduced.matches){manager.current=null;Object.assign(manager,dest);}
@@ -451,7 +544,8 @@ function startViewer() {
 
   viewSelect.value=manager.view;canvas.dataset.view=manager.view;
   try {
-    const gl=canvas.getContext('webgl',{alpha:true,antialias:true,premultipliedAlpha:false,preserveDrawingBuffer:false});
+    const options={alpha:true,antialias:true,premultipliedAlpha:false,preserveDrawingBuffer:false};
+    const gl=canvas.getContext('webgl2',options) || canvas.getContext('webgl',options);
     if(gl)renderer=createRenderer(gl);
   } catch(error) {console.error(error);}
   changeSize(selected);
