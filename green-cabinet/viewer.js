@@ -5,8 +5,12 @@ const faces = ['rear', 'left', 'right', 'header', 'lip', 'toe'];
 const links = {
   '#overview':'overview', '#front':'front', '#rear':'rear', '#left':'left', '#right':'right',
   '#header':'header', '#rear-streax':'rear-streax', '#rear-powders':'rear-powders',
-  '#face-serums':'serum', '#streax':'streax', '#hair-serums':'streax',
-  '#buds-roots':'buds', '#wowish-skincare':'skincare', '#soft-touch':'soft', '#gel-scrub-soaps':'soft-shelf'
+  '#face-serums':'serum', '#streax':'streax', '#hair-serums':'streax-serums',
+  '#buds-roots':'buds', '#wowish-skincare':'skincare', '#soft-touch':'soft', '#gel-scrub-soaps':'soft-shelf',
+  '#streax-colours':'streax-colours', '#streax-serums':'streax-serums',
+  '#buds-powders':'buds-powders', '#buds-teas':'buds-teas',
+  '#wowish-washes':'wowish-washes', '#wowish-oils':'wowish-oils',
+  '#soft-touch-sun-care':'soft-sun', '#rear-soft-touch':'rear-soft'
 };
 const hashFor = Object.fromEntries(Object.entries(links).map(([hash,name]) => [name,hash]));
 hashFor.streax = '#streax';
@@ -62,17 +66,22 @@ function viewPose(name,width,aspect,art) {
   const fixed=(yaw,pitch,aim,halfHeight,halfWidth) => ({
     yaw,pitch,aim,offsetX:0,zoom:base/Math.max(halfHeight,halfWidth/aspect)
   });
-  const rearBrand={'rear-streax':'streax','rear-powders':'buds',serum:'wowish'}[name];
+  const rearBrand={'rear-streax':'streax','rear-powders':'buds',serum:'wowish','rear-soft':'soft'}[name];
   if (rearBrand) {
     const [x,y,w,h]=art.stations[rearBrand];
     const caption=art.captions?.[rearBrand] || [0,width];
     // Keep the serum close-up centered on the four packs at every screen width.
-    const include=name==='serum'?0:clamp((aspect-.76)/.58,0,1);
+    const include=(name==='serum'||name==='rear-soft')?0:clamp((aspect-.76)/.58,0,1);
     const l=x+include*(Math.min(x,caption[0])-x);
     const r=x+w+include*(Math.max(x+w,caption[1])-(x+w));
     const pose=fixed(180,0,52-y-h/2,h/2+.34,(r-l)/2+.34);
     pose.offsetX=width/2-(l+r)/2;
     return pose;
+  }
+  const crop=art.details?.[name];
+  if (crop && ['streax-colours','streax-serums','buds-powders','buds-teas','wowish-washes','wowish-oils','soft-sun'].includes(name)) {
+    const [x,y,w,h]=crop.rect;
+    return fixed(crop.face==='left'?270:90,0,52-y-h/2,h/2+.09,Math.max(x+w-6,6-x)+.1);
   }
   if (name==='header') return fixed(0,0,48,4.34,width/2+.28);
   if (name==='left'||name==='right') return fixed(name==='left'?270:90,0,26,27.8,6.45);
@@ -104,6 +113,8 @@ function startViewer() {
   const wowishShelvesURL=wowishDownload.getAttribute('href');
   const wowishShelvesFile=wowishDownload.download;
   function setWowishDownload(view) {
+    const aloeLink=document.querySelector('#aloe-label');
+    aloeLink.style.display=['soft-shelf','soft','rear-soft'].includes(view)?'inline-flex':'none';
     const serum=view==='serum', title=serum?'Wowish serums':'Wowish shelves';
     wowishDownload.href=serum?'./packshots/wowish-serums-sharp-4k.png':wowishShelvesURL;
     wowishDownload.download=serum?'Wowish-Face-Serums-4K.png':wowishShelvesFile;
@@ -127,7 +138,7 @@ function startViewer() {
     const filename = 'Yusuf-Overseas-Green-Cabinet-' + selected + 'in';
     document.querySelector('#download-film').download = filename + '-4K.mp4';
     const artworkDownload = document.querySelector('#download-art');
-    artworkDownload.href = './green-cabinet/cabinet-' + selected + '-rear-4k.png?v=fb3c1ed20a63';
+    artworkDownload.href = './green-cabinet/cabinet-' + selected + '-rear-4k.png?v=1c3cbf54344e';
     artworkDownload.download = filename + '-Rear-4K.png';
     const panels = document.querySelector('#download-panels');
     panels.href = './4k-panels/?size=' + selected + '&download=1';
@@ -242,10 +253,13 @@ function startViewer() {
   }
   function showPoster() {
     removeElevation();
-    if (!staticMode && loaded===selected) {poster.hidden=true;return;}
+    const requested=currentArt().details?.[manager.view];
+    if (!staticMode && loaded===selected && (!requested || canvas.dataset.detailTexture===requested.image)) {
+      poster.hidden=true;return;
+    }
     const art=currentArt(),view=manager.view || 'overview';
     const still=art.posters || {};
-    const brand={'rear-streax':'streax','rear-powders':'buds'}[view];
+    const brand={'rear-streax':'streax','rear-powders':'buds','rear-soft':'soft'}[view];
 
     const main=canvas.parentElement;
     poster.hidden=false;poster.classList.remove('header-preview');
@@ -271,6 +285,11 @@ function startViewer() {
       const ar=aspect(),pose=viewPose(view,selected,ar,art);
       const half=overviewHalf(selected,ar)/pose.zoom,halfW=half*ar;
       return staticDrawing('rear',[selected/2-pose.offsetX-halfW,52-pose.aim-half,2*halfW,2*half]);
+    }
+    const crop=art.details?.[view];
+    if (crop && ['streax-colours','streax-serums','buds-powders','buds-teas','wowish-washes','wowish-oils','soft-sun'].includes(view)) {
+      const [x,y,w,h]=crop.rect;
+      return staticDrawing(crop.face,[x-.1,y-.09,w+.2,h+.18],view);
     }
     if (view==='soft-shelf') return staticDrawing('right',[-.18,39.85,12.36,9.8]);
     const left=view==='streax'||view==='skincare';
@@ -301,7 +320,7 @@ function startViewer() {
   function presentModel() {
     canvas.hidden=false;poster.hidden=true;statusNote.hidden=true;
     // The serum elevation is already displaying the exact crop while the GPU uploads it.
-    if(manager.view!=='serum' || canvas.dataset.detailTexture===currentArt().details?.serum?.image)removeElevation();
+    if(!currentArt().details?.[manager.view] || canvas.dataset.detailTexture===currentArt().details[manager.view].image)removeElevation();
     const film=document.querySelector('#fallback-film');if(film)film.hidden=true;
     canvas.dataset.renderedWidth=String(loaded);canvas.dataset.rearTexture=currentArt().images.rear;
     document.body.classList.remove('unavailable');document.body.classList.add('viewer-ready');
@@ -425,8 +444,8 @@ function startViewer() {
             active={texture,face:next.face,rect:[x/faceWidth,1-(y+h)/52,w/faceWidth,h/52]};
             canvas.dataset[datasetKey]=next.image;
             invalidate();
-            if(datasetKey==='detailTexture' && manager.view==='serum' && !staticMode && loaded===width)
-              requestAnimationFrame(()=>{if(current() && manager.view==='serum')removeElevation();});
+            if(datasetKey==='detailTexture' && currentArt().details?.[manager.view]===next && !staticMode && loaded===width)
+              requestAnimationFrame(()=>{if(current() && currentArt().details?.[manager.view]===next)removeElevation();});
           }).catch(error=>{if(current())console.warn('Cabinet detail image could not be loaded',error);});
         }
       };
@@ -517,11 +536,32 @@ function startViewer() {
       const a=radians(m.yaw),p=radians(m.pitch),ca=Math.cos(a),sa=Math.sin(a),cp=Math.cos(p),sp=Math.sin(p);
       const ar=w/h;
       const serum=currentArt().details?.serum;
-      const freeRear=!m.view || m.view==='overview' || m.view==='rear';
       // Retain the high-resolution product patch through free drags and zooms from any starting view.
       // Release it on returning to an overview-scale frame or changing to a named product group.
-      if(!freeRear || m.zoom<1.075 || namedDetail.source===serum)manualSerum.set(null);
-      else if(ca<-.12 && model.width===selected)manualSerum.set(serum||null);
+      if(model.width===selected) {
+        const details=currentArt().details;
+        const face=Math.abs(sa)>.76 ? (sa>0?'right':'left') : ca<-.15?'rear':null;
+        const isShelf=Boolean(details[m.view]);
+        const top=52-m.aim;
+        if(!isShelf && m.zoom>=1.075 && face) {
+          // Keep the nearest shelf at native detail after a drag or a zoom from the full panel.
+          // Rank whole-cabinet stations by their centers, preferring tight shelf crops on the sides.
+          const candidates=Object.entries(details).filter(([id,d])=>d.face===face &&
+            (face==='rear'||!['streax','buds','skincare','soft'].includes(id)));
+          candidates.sort((a,b)=>Math.abs(top-a[1].rect[1]-a[1].rect[3]/2)-Math.abs(top-b[1].rect[1]-b[1].rect[3]/2));
+          const nearest=candidates[0]?.[1];
+          if(!m.view && namedDetail.source?.face===face) {
+            // Selecting a shelf then zooming into its labels should retain that shelf's exact crop.
+            if(['streax','buds','skincare','soft'].some(id=>details[id]===namedDetail.source) && nearest)
+              namedDetail.set(nearest);
+          } else if(nearest)namedDetail.set(nearest);
+          const second=face==='rear' && namedDetail.source!==serum?serum:candidates.find(c=>c[1]!==namedDetail.source)?.[1];
+          manualSerum.set(second||null);
+        } else {
+          manualSerum.set(null);
+          if(!isShelf)namedDetail.set(null);
+        }
+      }
       let half=overviewHalf(model.width,ar)/m.zoom;
       if(m.view==='left'||m.view==='right'){
         // Keep the whole cabinet in a narrow portrait frame as its wide face turns into view.
@@ -566,7 +606,7 @@ function startViewer() {
       spinButton.disabled=!canRotate();spinButton.textContent=manager.spinning?'Pause':'Rotate';
       spinButton.setAttribute('aria-pressed',String(manager.spinning));
       spinButton.title=spinButton.disabled?'Rotation is available in full-cabinet views':(manager.spinning?'Pause cabinet rotation':'Rotate the cabinet');
-      plus.disabled=manager.zoom>=4.999;minus.disabled=manager.zoom<=.681;invalidate();
+      plus.disabled=manager.zoom>=11.999;minus.disabled=manager.zoom<=.681;invalidate();
     }
     function stop(){removeElevation();rotationChoice=false;manager.current=null;manager.spinning=false;manager.view='';last=0;update();}
     function view(name,immediate=false) {
@@ -585,7 +625,7 @@ function startViewer() {
       }
       invalidate();
     }
-    function zoom(f){stop();manager.zoom=clamp(manager.zoom*f,.68,5);update();}
+    function zoom(f){stop();manager.zoom=clamp(manager.zoom*f,.68,12);update();}
     spinButton.onclick=()=>{
       if(!canRotate())return;
       rotationChoice=!manager.spinning;
@@ -599,7 +639,7 @@ function startViewer() {
     canvas.onpointerdown=e=>{canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);stop();points.set(e.pointerId,{x:e.clientX,y:e.clientY});if(points.size===2)span=gap();};
     canvas.onpointermove=e=>{
       const old=points.get(e.pointerId);if(!old)return;points.set(e.pointerId,{x:e.clientX,y:e.clientY});
-      if(points.size===2){const next=gap();if(span>0&&next>0)manager.zoom=clamp(manager.zoom*next/span,.68,5);span=next;}
+      if(points.size===2){const next=gap();if(span>0&&next>0)manager.zoom=clamp(manager.zoom*next/span,.68,12);span=next;}
       else if(points.size===1){manager.yaw-=(e.clientX-old.x)*.4;manager.pitch=clamp(manager.pitch+(e.clientY-old.y)*.28,1,62);}
       update();
     };
