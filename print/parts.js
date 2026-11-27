@@ -13,10 +13,17 @@ globalThis.CabinetPrint = (() => {
     if (data.sha256!==id || !Number.isSafeInteger(data.bytes) || !Array.isArray(data.parts) || !data.parts.length ||
         data.parts.some(p=>!validSha(p.sha256)||!Number.isSafeInteger(p.bytes)||p.bytes<1||p.bytes>16*1024*1024) ||
         data.parts.reduce((n,p)=>n+p.bytes,0)!==data.bytes) throw Error('The print manifest is incomplete.');
+    if (data.archiveCommit) {
+      if (!/^[0-9a-f]{40}$/.test(data.archiveCommit)) throw Error('Unknown print archive.');
+      for (const part of data.parts) part.archiveCommit=data.archiveCommit;
+    }
     return data;
   }
   async function read(base,part) {
-    const url = new URL('parts/' + part.sha256 + '.bin', base);
+    const storage = part.archiveCommit
+      ? new URL('https://raw.githubusercontent.com/truuglobal25-hash/priya-cabinet/' + part.archiveCommit + '/print/')
+      : base;
+    const url = new URL('parts/' + part.sha256 + '.bin', storage);
     const retries = [0, 400, 1200, 3000];
     let lastError;
     for (const delay of retries) {

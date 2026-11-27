@@ -66,8 +66,8 @@ function viewPose(name,width,aspect,art) {
   if (rearBrand) {
     const [x,y,w,h]=art.stations[rearBrand];
     const caption=art.captions?.[rearBrand] || [0,width];
-    // Portrait framing contains the whole group. Wider screens also admit its printed caption.
-    const include=clamp((aspect-.76)/.58,0,1);
+    // Keep the serum close-up centered on the four packs at every screen width.
+    const include=name==='serum'?0:clamp((aspect-.76)/.58,0,1);
     const l=x+include*(Math.min(x,caption[0])-x);
     const r=x+w+include*(Math.max(x+w,caption[1])-(x+w));
     const pose=fixed(180,0,52-y-h/2,h/2+.34,(r-l)/2+.34);
@@ -100,7 +100,20 @@ function startViewer() {
   const currentArt=()=>manifest[selected];
   const aspect=()=>Math.max(.1,canvas.parentElement.clientWidth/Math.max(1,canvas.parentElement.clientHeight));
 
+  const wowishDownload=document.querySelector('#download-wowish');
+  const wowishShelvesURL=wowishDownload.getAttribute('href');
+  const wowishShelvesFile=wowishDownload.download;
+  function setWowishDownload(view) {
+    const serum=view==='serum', title=serum?'Wowish serums':'Wowish shelves';
+    wowishDownload.href=serum?'./packshots/wowish-serums-sharp-4k.png':wowishShelvesURL;
+    wowishDownload.download=serum?'Wowish-Face-Serums-4K.png':wowishShelvesFile;
+    wowishDownload.setAttribute('aria-label','Download 4K '+title);
+    wowishDownload.querySelector('.standard-label').textContent='Download 4K '+title;
+    wowishDownload.querySelector('.compact-label').textContent='4K '+title;
+  }
+
   function uiSize() {
+    setWowishDownload(manager.view);
     radios.forEach(input=>{input.checked=Number(input.value)===selected;});
     const dimensions=document.querySelector('#cabinet-dimensions');
     if (dimensions) dimensions.textContent=selected+'″ W × 52″ H × 12″ D';
@@ -114,7 +127,7 @@ function startViewer() {
     const filename = 'Yusuf-Overseas-Green-Cabinet-' + selected + 'in';
     document.querySelector('#download-film').download = filename + '-4K.mp4';
     const artworkDownload = document.querySelector('#download-art');
-    artworkDownload.href = './green-cabinet/cabinet-' + selected + '-rear-4k.png?v=b81d3e843c48';
+    artworkDownload.href = './green-cabinet/cabinet-' + selected + '-rear-4k.png?v=fb3c1ed20a63';
     artworkDownload.download = filename + '-Rear-4K.png';
     const panels = document.querySelector('#download-panels');
     panels.href = './4k-panels/?size=' + selected + '&download=1';
@@ -167,7 +180,7 @@ function startViewer() {
     return detailBlobs.get(detail.sha256);
   }
 
-  function staticDrawing(panel,viewBox) {
+  function staticDrawing(panel,viewBox,detailView=manager.view) {
     const ns='http://www.w3.org/2000/svg';
     elevation=document.createElementNS(ns,'svg');elevation.id='cabinet-static-art';
     elevation.style.cssText='position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none';
@@ -182,7 +195,7 @@ function startViewer() {
     }
     if (panel!=='front') {
       photo(panel,0,0,panel==='left'||panel==='right'?12:selected,52);
-      const detail=currentArt().details?.[manager.view];
+      const detail=currentArt().details?.[detailView];
       if (detail && detail.face===panel) {
         const [x,y,width,height]=detail.rect;
         const image=shape('image',{x,y,width,height,preserveAspectRatio:'none'});
@@ -216,7 +229,8 @@ function startViewer() {
     let photo,ratio;
     if (!photo && view==='overview') photo=still.overview;
     if (!photo && view==='front') photo=still.front;
-    if (!photo && (view==='rear'||view==='overview')) {photo=still.rear || art.images.rear;ratio=selected/52;}
+    if(view==='rear')return staticDrawing('rear',[0,0,selected,52],'serum');
+    if (!photo && view==='overview') {photo=still.rear || art.images.rear;ratio=selected/52;}
     if (!photo && view==='header') {photo=art.images.header;ratio=selected/8;}
     if (!photo && (view==='left'||view==='right')) {photo=art.images[view];ratio=12/52;}
     if (photo) {
@@ -240,6 +254,7 @@ function startViewer() {
   }
 
   function chooseView(name,immediate=false) {
+    setWowishDownload(name);
     manager.view=name;manager.spinning=false;
     if (renderer) renderer.view(name,immediate);
     viewSelect.value=name;canvas.dataset.view=name;
@@ -312,15 +327,19 @@ function startViewer() {
       void main(){vec3 p=pos-target;gl_Position=vec4(dot(p,right)/frame.x,dot(p,up)/frame.y,-dot(p,eye)/150.,1.);tex=uv;normal=norm;point=pos;}`;
     const precision=gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER,gl.HIGH_FLOAT).precision?'highp':'mediump';
     const fragment=`precision ${precision} float;varying vec2 tex;varying vec3 normal,point;
-      uniform sampler2D sheet,detailSheet;uniform vec4 detailRect;uniform float kind,halfWidth;
+      uniform sampler2D sheet,detailSheet,serumSheet;uniform vec4 detailRect,serumRect;uniform float kind,halfWidth;
+      vec3 patchColor(vec3 base,sampler2D image,vec4 rect){
+        if(rect.z<=0.0)return base;
+        vec2 uv=(tex-rect.xy)/rect.zw;
+        if(any(lessThan(uv,vec2(0.0))) || any(greaterThan(uv,vec2(1.0))))return base;
+        return texture2D(image,uv).rgb;
+      }
       void main(){
         if(kind>2.5){vec2 f=vec2((point.x-1.)/(halfWidth+3.),(point.y-1.)/8.);gl_FragColor=vec4(.25,.24,.19,.20*exp(-1.5*dot(f,f)));return;}
         if(kind>1.5){
           vec3 color=texture2D(sheet,tex).rgb;
-          if(detailRect.z>0.0){
-            vec2 uv=(tex-detailRect.xy)/detailRect.zw;
-            if(all(greaterThanEqual(uv,vec2(0.))) && all(lessThanEqual(uv,vec2(1.))))color=texture2D(detailSheet,uv).rgb;
-          }
+          color=patchColor(color,detailSheet,detailRect);
+          color=patchColor(color,serumSheet,serumRect);
           gl_FragColor=vec4(color*(.985+.015*max(normal.z,0.)),1.);return;
         }
         float lit=.79+.15*max(0.,dot(normal,normalize(vec3(-.6,-.6,1.))))+.045*normal.z;
@@ -347,10 +366,10 @@ function startViewer() {
     }
     gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));
     gl.useProgram(program);
-    const u=Object.fromEntries(['right','up','eye','target','frame','sheet','detailSheet','detailRect','kind','halfWidth'].map(n=>[n,gl.getUniformLocation(program,n)]));
+    const u=Object.fromEntries(['right','up','eye','target','frame','sheet','detailSheet','detailRect','serumSheet','serumRect','kind','halfWidth'].map(n=>[n,gl.getUniformLocation(program,n)]));
     const attrs=[['pos',3,0],['norm',3,12],['uv',2,24]].map(([key,n,o])=>[gl.getAttribLocation(program,key),n,o]);
     attrs.forEach(([a])=>gl.enableVertexAttribArray(a));
-    gl.uniform1i(u.sheet,0);gl.uniform1i(u.detailSheet,1);gl.enable(gl.DEPTH_TEST);gl.enable(gl.CULL_FACE);gl.cullFace(gl.BACK);
+    gl.uniform1i(u.sheet,0);gl.uniform1i(u.detailSheet,1);gl.uniform1i(u.serumSheet,2);gl.enable(gl.DEPTH_TEST);gl.enable(gl.CULL_FACE);gl.cullFace(gl.BACK);
     gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.clearColor(0,0,0,0);
     const maximum=gl.getParameter(gl.MAX_TEXTURE_SIZE);
     const af=gl.getExtension('EXT_texture_filter_anisotropic');
@@ -358,25 +377,33 @@ function startViewer() {
     const viewportLimits=gl.getParameter(gl.MAX_VIEWPORT_DIMS);
     const renderbufferLimit=gl.getParameter(gl.MAX_RENDERBUFFER_SIZE);
     let model=null,objects=new Map(),frame=0,last=0;
-    let detail=null,requestedDetail=null,detailRevision=0;
-    function useDetail(view) {
-      const next=currentArt().details?.[view] || null;
-      if(next===requestedDetail)return;
-      requestedDetail=next;const revision=++detailRevision;
-      if(detail){gl.deleteTexture(detail.texture);detail=null;}
-      delete canvas.dataset.detailTexture;
-      if(!next)return;
-      const width=selected;
-      const isCurrent=()=>revision===detailRevision && selected===width && model?.width===width;
-      detailURL(next).then(url=>isCurrent()?fetchTexture(url,isCurrent):null).then(texture=>{
-        if(!texture)return;
-        if(!isCurrent()){gl.deleteTexture(texture);return;}
-        const [x,y,w,h]=next.rect,faceWidth=next.face==='rear'?width:12;
-        detail={texture,face:next.face,rect:[x/faceWidth,1-(y+h)/52,w/faceWidth,h/52]};
-        canvas.dataset.detailTexture=next.image;
-        invalidate();
-      }).catch(error=>{if(isCurrent())console.warn('Cabinet detail image could not be loaded',error);});
+    // A named close-up and a manual camera zoom may cover different regions on the same face.
+    function detailLayer(datasetKey) {
+      let requested=null,active=null,revision=0;
+      return {
+        get active(){return active;},
+        get source(){return requested;},
+        set(next){
+          if(next===requested)return;
+          requested=next;const token=++revision;
+          if(active){gl.deleteTexture(active.texture);active=null;}
+          delete canvas.dataset[datasetKey];
+          if(!next)return;
+          const width=selected;
+          const current=()=>token===revision && selected===width && model?.width===width;
+          detailURL(next).then(url=>current()?fetchTexture(url,current):null).then(texture=>{
+            if(!texture)return;
+            if(!current()){gl.deleteTexture(texture);return;}
+            const [x,y,w,h]=next.rect,faceWidth=next.face==='rear'?width:12;
+            active={texture,face:next.face,rect:[x/faceWidth,1-(y+h)/52,w/faceWidth,h/52]};
+            canvas.dataset[datasetKey]=next.image;
+            invalidate();
+          }).catch(error=>{if(current())console.warn('Cabinet detail image could not be loaded',error);});
+        }
+      };
     }
+    const namedDetail=detailLayer('detailTexture'),manualSerum=detailLayer('serumTexture');
+    function useDetail(view){namedDetail.set(currentArt().details?.[view]||null);}
     async function fetchTexture(url,current) {
       const im=new Image();im.src=url;await im.decode();if(!current())return null;
       let bitmap=im;
@@ -397,7 +424,7 @@ function startViewer() {
       return t;
     }
     async function load(width,urls,current) {
-      useDetail('');
+      useDetail('');manualSerum.set(null);
       // Keep shared faces resident and release the old-width GPU resources on commit.
       // A superseded or failed load cannot install mixed-width artwork.
       const entries=new Map(),fresh=new Set();
@@ -423,7 +450,10 @@ function startViewer() {
       const [buffer,n]=model.buffers[key];gl.uniform1f(u.kind,kind);gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
       attrs.forEach(([a,k,o])=>gl.vertexAttribPointer(a,k,gl.FLOAT,false,32,o));
       const base=model.textures[key]||model.textures.lip;
-      const overlay=detail?.face===key?detail:null;
+      const overlay=namedDetail.active?.face===key?namedDetail.active:null;
+      const serum=manualSerum.active?.face===key?manualSerum.active:null;
+      gl.uniform4fv(u.serumRect,serum?serum.rect:[0,0,0,0]);
+      gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,serum?serum.texture:base);
       gl.uniform4fv(u.detailRect,overlay?overlay.rect:[0,0,0,0]);
       gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,overlay?overlay.texture:base);
       gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,base);
@@ -449,6 +479,12 @@ function startViewer() {
       gl.viewport(0,0,w,h);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
       const a=radians(m.yaw),p=radians(m.pitch),ca=Math.cos(a),sa=Math.sin(a),cp=Math.cos(p),sp=Math.sin(p);
       const ar=w/h;
+      const serum=currentArt().details?.serum;
+      const freeRear=!m.view || m.view==='overview' || m.view==='rear';
+      // Retain the high-resolution product patch through free drags and zooms from any starting view.
+      // Release it on returning to an overview-scale frame or changing to a named product group.
+      if(!freeRear || m.zoom<1.075 || namedDetail.source===serum)manualSerum.set(null);
+      else if(ca<-.12 && model.width===selected)manualSerum.set(serum||null);
       let half=overviewHalf(model.width,ar)/m.zoom;
       if(m.view==='left'||m.view==='right'){
         // Keep the whole cabinet in a narrow portrait frame as its wide face turns into view.
