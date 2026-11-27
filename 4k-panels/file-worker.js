@@ -1,5 +1,5 @@
 'use strict';
-importScripts('./files.js?v=vector-bundles-1');
+importScripts('./files.js?v=shelf-scale-8f783d65');
 const scope = new URL('./', self.registration.scope);
 const base = new URL('../', scope);
 self.addEventListener('install', event => event.waitUntil(self.skipWaiting()));

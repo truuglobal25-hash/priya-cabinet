@@ -79,13 +79,12 @@ function viewPose(name,width,aspect,art) {
     return pose;
   }
   const crop=art.details?.[name];
-  if (crop && ['streax-colours','streax-serums','buds-powders','buds-teas','wowish-washes','wowish-oils','soft-sun'].includes(name)) {
+  if (crop && ['streax-colours','streax-serums','buds-powders','buds-teas','wowish-washes','wowish-oils','soft-sun','soft-shelf'].includes(name)) {
     const [x,y,w,h]=crop.rect;
     return fixed(crop.face==='left'?270:90,0,52-y-h/2,h/2+.09,Math.max(x+w-6,6-x)+.1);
   }
   if (name==='header') return fixed(0,0,48,4.34,width/2+.28);
   if (name==='left'||name==='right') return fixed(name==='left'?270:90,0,26,27.8,6.45);
-  if (name==='soft-shelf') return fixed(90,0,7.25,4.9,6.18);
   if (name==='streax'||name==='buds'||name==='skincare'||name==='soft') {
     return fixed(name==='streax'||name==='skincare'?270:90,0,
       {streax:36.4,buds:36.35,skincare:12.75,soft:12.75}[name],12.2,6.45);
@@ -190,7 +189,7 @@ function startViewer() {
     const filename = 'Yusuf-Overseas-Green-Cabinet-' + selected + 'in';
     document.querySelector('#download-film').download = filename + '-4K.mp4';
     const artworkDownload = document.querySelector('#download-art');
-    artworkDownload.href = './green-cabinet/cabinet-' + selected + '-rear-4k.png?v=1c3cbf54344e';
+    artworkDownload.href = './green-cabinet/cabinet-' + selected + '-rear-4k.png?v=8f783d65087d';
     artworkDownload.download = filename + '-Rear-4K.png';
     const panels = document.querySelector('#download-panels');
     panels.href = './4k-panels/?size=' + selected + '&download=1';
@@ -201,9 +200,10 @@ function startViewer() {
 
   function clipToShelf(element) {
     let clip='';
-    if (manager.view==='soft-shelf') {
+    if (manager.view==='soft-shelf' || manager.view==='wowish-washes') {
       const main=canvas.parentElement, w=main.clientWidth, h=main.clientHeight;
-      const ratio=12.36/9.8;
+      const [, , width, height] = currentArt().details[manager.view].rect;
+      const ratio=(width+.2)/(height+.18);
       const vertical=Math.max(0,Math.round((h-w/ratio)/2));
       const horizontal=Math.max(0,Math.round((w-h*ratio)/2));
       clip='inset('+vertical+'px '+horizontal+'px)';
@@ -341,11 +341,10 @@ function startViewer() {
       return staticDrawing('rear',[selected/2-pose.offsetX-halfW,52-pose.aim-half,2*halfW,2*half]);
     }
     const crop=art.details?.[view];
-    if (crop && ['streax-colours','streax-serums','buds-powders','buds-teas','wowish-washes','wowish-oils','soft-sun'].includes(view)) {
+    if (crop && ['streax-colours','streax-serums','buds-powders','buds-teas','wowish-washes','wowish-oils','soft-sun','soft-shelf'].includes(view)) {
       const [x,y,w,h]=crop.rect;
       return staticDrawing(crop.face,[x-.1,y-.09,w+.2,h+.18],view);
     }
-    if (view==='soft-shelf') return staticDrawing('right',[-.18,39.85,12.36,9.8]);
     const left=view==='streax'||view==='skincare';
     staticDrawing(left?'left':'right',[-.15,view==='streax'||view==='buds'?3.4:27.05,12.3,24.4]);
   }
