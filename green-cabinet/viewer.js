@@ -6,7 +6,7 @@ const links = {
   '#overview':'overview', '#front':'front', '#rear':'rear', '#left':'left', '#right':'right',
   '#header':'header', '#rear-streax':'rear-streax', '#rear-powders':'rear-powders',
   '#face-serums':'serum', '#streax':'streax', '#hair-serums':'streax',
-  '#buds-roots':'buds', '#wowish-skincare':'skincare', '#soft-touch':'soft'
+  '#buds-roots':'buds', '#wowish-skincare':'skincare', '#soft-touch':'soft', '#gel-scrub-soaps':'soft-shelf'
 };
 const hashFor = Object.fromEntries(Object.entries(links).map(([hash,name]) => [name,hash]));
 hashFor.streax = '#streax';
@@ -76,6 +76,7 @@ function viewPose(name,width,aspect,art) {
   }
   if (name==='header') return fixed(0,0,48,4.34,width/2+.28);
   if (name==='left'||name==='right') return fixed(name==='left'?270:90,0,26,27.8,6.45);
+  if (name==='soft-shelf') return fixed(90,0,7.25,4.9,6.18);
   if (name==='streax'||name==='buds'||name==='skincare'||name==='soft') {
     return fixed(name==='streax'||name==='skincare'?270:90,0,
       {streax:36.4,buds:36.35,skincare:12.75,soft:12.75}[name],12.2,6.45);
@@ -113,10 +114,22 @@ function startViewer() {
     const filename = 'Yusuf-Overseas-Green-Cabinet-' + selected + 'in';
     document.querySelector('#download-film').download = filename + '-4K.mp4';
     const artworkDownload = document.querySelector('#download-art');
-    artworkDownload.href = './green-cabinet/cabinet-' + selected + '-rear-4k.png?v=0f6d13fef423';
+    artworkDownload.href = './green-cabinet/cabinet-' + selected + '-rear-4k.png?v=b81d3e843c48';
     artworkDownload.download = filename + '-Rear-4K.png';
     Object.assign(canvas.dataset,{cabinetWidth:String(selected),cabinetHeight:'52',cabinetDepth:'12'});
     document.dispatchEvent(new CustomEvent('cabinet-size-change',{bubbles:true,detail:{width:selected,depth:12,height:52}}));
+  }
+
+  function clipToShelf(element) {
+    let clip='';
+    if (manager.view==='soft-shelf') {
+      const main=canvas.parentElement, w=main.clientWidth, h=main.clientHeight;
+      const ratio=12.36/9.8;
+      const vertical=Math.max(0,Math.round((h-w/ratio)/2));
+      const horizontal=Math.max(0,Math.round((w-h*ratio)/2));
+      clip='inset('+vertical+'px '+horizontal+'px)';
+    }
+    if (element.style.clipPath!==clip) element.style.clipPath=clip;
   }
 
   function staticDrawing(panel,viewBox) {
@@ -140,6 +153,7 @@ function startViewer() {
       [8,14.5,26,37.5].forEach(z=>photo('lip',.5,z,selected-1,.5));
       photo('toe',.5,49,selected-1,3);
     }
+    clipToShelf(elevation);
     poster.after(elevation);poster.hidden=true;
   }
 
@@ -172,6 +186,7 @@ function startViewer() {
     if (rear) {
       const [x,y,w,h]=art.stations[rear];return staticDrawing('rear',[x-.3,y-.3,w+.6,h+.6]);
     }
+    if (view==='soft-shelf') return staticDrawing('right',[-.18,39.85,12.36,9.8]);
     const left=view==='streax'||view==='skincare';
     staticDrawing(left?'left':'right',[-.15,view==='streax'||view==='buds'?3.4:27.05,12.3,24.4]);
   }
@@ -334,6 +349,7 @@ function startViewer() {
         if(step===1)m.current=null;
       }
       if(m.spinning&&!transitioning)m.yaw+=dt*orbitSpeed;
+      clipToShelf(canvas);
       const dpr=Math.min(window.devicePixelRatio||1,2);
       const w=Math.round(canvas.clientWidth*dpr),h=Math.round(canvas.clientHeight*dpr);if(!w||!h)return;
       if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}
