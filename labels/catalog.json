@@ -1,0 +1,408 @@
+[
+  {
+    "id": "streax-black",
+    "name": "Natural Black 1 · Cream Hair Colour",
+    "brand": "Streax",
+    "sourceId": 1030,
+    "faceCrop": [
+      0.055,
+      0.005,
+      0.997,
+      0.995
+    ],
+    "svg": "labels/streax-black.svg",
+    "pdf": "labels/streax-black.pdf"
+  },
+  {
+    "id": "streax-burgundy",
+    "name": "Burgundy 3.16 · Cream Hair Colour",
+    "brand": "Streax",
+    "sourceId": 1074,
+    "faceCrop": [
+      0.055,
+      0.005,
+      0.997,
+      0.995
+    ],
+    "svg": "labels/streax-burgundy.svg",
+    "pdf": "labels/streax-burgundy.pdf"
+  },
+  {
+    "id": "streax-red",
+    "name": "Flame Red 0.6 · Cream Hair Colour",
+    "brand": "Streax",
+    "sourceId": 1050,
+    "faceCrop": [
+      0.055,
+      0.005,
+      0.997,
+      0.995
+    ],
+    "svg": "labels/streax-red.svg",
+    "pdf": "labels/streax-red.pdf"
+  },
+  {
+    "id": "streax-professional",
+    "name": "Professional Vitariche Gloss Hair Serum",
+    "brand": "Streax",
+    "sourceId": 1096,
+    "faceCrop": [
+      0.025,
+      0.385,
+      0.98,
+      0.935
+    ],
+    "svg": "labels/streax-professional.svg",
+    "pdf": "labels/streax-professional.pdf"
+  },
+  {
+    "id": "streax-walnut",
+    "name": "Walnut Hair Serum",
+    "brand": "Streax",
+    "sourceId": 1108,
+    "faceCrop": [
+      0.045,
+      0.402,
+      0.948,
+      0.967
+    ],
+    "svg": "labels/streax-walnut.svg",
+    "pdf": "labels/streax-walnut.pdf"
+  },
+  {
+    "id": "buds-amla",
+    "name": "Amla Fruit Powder",
+    "brand": "Buds & Roots",
+    "sourceId": 1260,
+    "faceCrop": [
+      0.028,
+      0.15,
+      0.979,
+      0.995
+    ],
+    "svg": "labels/buds-amla.svg",
+    "pdf": "labels/buds-amla.pdf"
+  },
+  {
+    "id": "buds-shilajit",
+    "name": "Himalayan Shilajit Powder",
+    "brand": "Buds & Roots",
+    "sourceId": 1276,
+    "faceCrop": [
+      0.029,
+      0.199,
+      0.976,
+      0.995
+    ],
+    "svg": "labels/buds-shilajit.svg",
+    "pdf": "labels/buds-shilajit.pdf"
+  },
+  {
+    "id": "buds-ashwagandha",
+    "name": "Ashwagandha Extract Powder",
+    "brand": "Buds & Roots",
+    "sourceId": 1302,
+    "faceCrop": [
+      0.028,
+      0.17,
+      0.978,
+      0.988
+    ],
+    "svg": "labels/buds-ashwagandha.svg",
+    "pdf": "labels/buds-ashwagandha.pdf"
+  },
+  {
+    "id": "buds-detox",
+    "name": "Detox Herbal Tea",
+    "brand": "Buds & Roots",
+    "sourceId": 1328,
+    "faceCrop": [
+      0.001,
+      0.047,
+      0.928,
+      0.998
+    ],
+    "svg": "labels/buds-detox.svg",
+    "pdf": "labels/buds-detox.pdf"
+  },
+  {
+    "id": "buds-pomegranate",
+    "name": "Pomegranate Powder",
+    "brand": "Buds & Roots",
+    "sourceId": 1346,
+    "faceCrop": [
+      0.026,
+      0.199,
+      0.979,
+      0.997
+    ],
+    "svg": "labels/buds-pomegranate.svg",
+    "pdf": "labels/buds-pomegranate.pdf"
+  },
+  {
+    "id": "buds-hibiscus",
+    "name": "Hibiscus Powder",
+    "brand": "Buds & Roots",
+    "sourceId": 1364,
+    "faceCrop": [
+      0.026,
+      0.165,
+      0.978,
+      0.997
+    ],
+    "svg": "labels/buds-hibiscus.svg",
+    "pdf": "labels/buds-hibiscus.pdf"
+  },
+  {
+    "id": "buds-soursop",
+    "name": "Soursop Leaf Herbal Tea",
+    "brand": "Buds & Roots",
+    "sourceId": 1390,
+    "faceCrop": [
+      0.002,
+      0.044,
+      0.918,
+      0.998
+    ],
+    "svg": "labels/buds-soursop.svg",
+    "pdf": "labels/buds-soursop.pdf"
+  },
+  {
+    "id": "soft-sunblock",
+    "name": "Sunblock & Whitening Cream · 200 g",
+    "brand": "SoftTouch",
+    "sourceId": 1144,
+    "faceCrop": [
+      0.18,
+      0.046,
+      0.985,
+      0.888
+    ],
+    "svg": "labels/soft-sunblock.svg",
+    "pdf": "labels/soft-sunblock.pdf"
+  },
+  {
+    "id": "soft-scrub-225",
+    "name": "Turmeric & Sandalwood Facial Scrub · 225 g",
+    "brand": "SoftTouch",
+    "sourceId": 1170,
+    "faceCrop": [
+      0.033,
+      0.04,
+      0.985,
+      0.868
+    ],
+    "svg": "labels/soft-scrub-225.svg",
+    "pdf": "labels/soft-scrub-225.pdf"
+  },
+  {
+    "id": "soft-aloe",
+    "name": "Multi Purpose Aloe Vera Gel · 99%",
+    "brand": "SoftTouch",
+    "sourceId": 1242,
+    "faceCrop": [
+      0.231,
+      0.199,
+      0.503,
+      0.477
+    ],
+    "svg": "labels/soft-aloe.svg",
+    "pdf": "labels/soft-aloe.pdf"
+  },
+  {
+    "id": "soft-scrub-500",
+    "name": "Blackseed & Aloe Vera Facial Scrub · 500 g",
+    "brand": "SoftTouch",
+    "sourceId": 1242,
+    "faceCrop": [
+      0.537,
+      0.261,
+      0.79,
+      0.551
+    ],
+    "svg": "labels/soft-scrub-500.svg",
+    "pdf": "labels/soft-scrub-500.pdf"
+  },
+  {
+    "id": "soft-charcoal",
+    "name": "Activated Wood Charcoal Organic Soap",
+    "brand": "SoftTouch",
+    "sourceId": 1242,
+    "faceCrop": [
+      0.247,
+      0.574,
+      0.495,
+      0.863
+    ],
+    "svg": "labels/soft-charcoal.svg",
+    "pdf": "labels/soft-charcoal.pdf"
+  },
+  {
+    "id": "soft-turmeric",
+    "name": "Organic Turmeric Soap",
+    "brand": "SoftTouch",
+    "sourceId": 1242,
+    "faceCrop": [
+      0.688,
+      0.601,
+      0.917,
+      0.873
+    ],
+    "svg": "labels/soft-turmeric.svg",
+    "pdf": "labels/soft-turmeric.pdf"
+  },
+  {
+    "id": "wow-kojic",
+    "name": "Kojic Acid Face Wash",
+    "brand": "Wowish",
+    "sourceId": 1429,
+    "faceCrop": [
+      0.092,
+      0.24,
+      0.331,
+      0.827
+    ],
+    "svg": "labels/wow-kojic.svg",
+    "pdf": "labels/wow-kojic.pdf"
+  },
+  {
+    "id": "wow-turmeric",
+    "name": "Turmeric Foaming Face Wash",
+    "brand": "Wowish",
+    "sourceId": 1429,
+    "faceCrop": [
+      0.376,
+      0.478,
+      0.583,
+      0.879
+    ],
+    "svg": "labels/wow-turmeric.svg",
+    "pdf": "labels/wow-turmeric.pdf"
+  },
+  {
+    "id": "wow-vitc-wash",
+    "name": "Vitamin C Foaming Face Wash",
+    "brand": "Wowish",
+    "sourceId": 1429,
+    "faceCrop": [
+      0.638,
+      0.485,
+      0.857,
+      0.918
+    ],
+    "svg": "labels/wow-vitc-wash.svg",
+    "pdf": "labels/wow-vitc-wash.pdf"
+  },
+  {
+    "id": "wow-7in1",
+    "name": "7 in One Hair Oil",
+    "brand": "Wowish",
+    "sourceId": 1462,
+    "faceCrop": [
+      0.385,
+      0.202,
+      0.607,
+      0.866
+    ],
+    "svg": "labels/wow-7in1.svg",
+    "pdf": "labels/wow-7in1.pdf"
+  },
+  {
+    "id": "wow-rosemary",
+    "name": "Rosemary Hair Oil",
+    "brand": "Wowish",
+    "sourceId": 1462,
+    "faceCrop": [
+      0.645,
+      0.244,
+      0.874,
+      0.919
+    ],
+    "svg": "labels/wow-rosemary.svg",
+    "pdf": "labels/wow-rosemary.pdf"
+  },
+  {
+    "id": "wow-eye-jar",
+    "name": "Under Eye Cream · Jar",
+    "brand": "Wowish",
+    "sourceId": 1462,
+    "faceCrop": [
+      0.068,
+      0.481,
+      0.347,
+      0.645
+    ],
+    "svg": "labels/wow-eye-jar.svg",
+    "pdf": "labels/wow-eye-jar.pdf"
+  },
+  {
+    "id": "wow-eye-carton",
+    "name": "Under Eye Cream · Carton",
+    "brand": "Wowish",
+    "sourceId": 1462,
+    "faceCrop": [
+      0.042,
+      0.645,
+      0.366,
+      0.945
+    ],
+    "svg": "labels/wow-eye-carton.svg",
+    "pdf": "labels/wow-eye-carton.pdf"
+  },
+  {
+    "id": "wow-niacinamide-bottle",
+    "name": "Niacinamide Calm Serum · Bottle",
+    "brand": "Wowish",
+    "sourceId": 1002,
+    "faceCrop": [
+      0.071,
+      0.493,
+      0.212,
+      0.844
+    ],
+    "svg": "labels/wow-niacinamide-bottle.svg",
+    "pdf": "labels/wow-niacinamide-bottle.pdf"
+  },
+  {
+    "id": "wow-niacinamide-carton",
+    "name": "Niacinamide Calm Serum · Carton",
+    "brand": "Wowish",
+    "sourceId": 1002,
+    "faceCrop": [
+      0.206,
+      0.006,
+      0.464,
+      0.828
+    ],
+    "svg": "labels/wow-niacinamide-carton.svg",
+    "pdf": "labels/wow-niacinamide-carton.pdf"
+  },
+  {
+    "id": "wow-vitc-bottle",
+    "name": "Vitamin C Brighten Serum · Bottle",
+    "brand": "Wowish",
+    "sourceId": 1002,
+    "faceCrop": [
+      0.502,
+      0.534,
+      0.641,
+      0.889
+    ],
+    "svg": "labels/wow-vitc-bottle.svg",
+    "pdf": "labels/wow-vitc-bottle.pdf"
+  },
+  {
+    "id": "wow-vitc-carton",
+    "name": "Vitamin C Brighten Serum · Carton",
+    "brand": "Wowish",
+    "sourceId": 1002,
+    "faceCrop": [
+      0.643,
+      0.038,
+      0.893,
+      0.861
+    ],
+    "svg": "labels/wow-vitc-carton.svg",
+    "pdf": "labels/wow-vitc-carton.pdf"
+  }
+]

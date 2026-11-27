@@ -109,6 +109,47 @@ function startViewer() {
   const currentArt=()=>manifest[selected];
   const aspect=()=>Math.max(.1,canvas.parentElement.clientWidth/Math.max(1,canvas.parentElement.clientHeight));
 
+  const main=canvas.parentElement;
+  const labels=startLabelViewer(open=>renderer?.holdLabels(open));
+  let tapped=null;
+  function hitAt(x,y) {
+    if (elevation) {
+      const m=elevation.getScreenCTM();
+      if (!m) return null;
+      const p=new DOMPoint(x,y).matrixTransform(m.inverse());
+      const box=elevation.viewBox.baseVal;
+      if(p.x<box.x || p.x>box.x+box.width || p.y<box.y || p.y>box.y+box.height)return null;
+      return labelAt(elevation.dataset.panel,p.x,p.y,selected);
+    }
+    if (!poster.hidden) {
+      if (poster.dataset.view!=='overview' || !poster.complete || !poster.naturalWidth) return null;
+      // The poster is the first, uncropped 2160 × 3840 frame of the cabinet turntable.
+      const r=poster.getBoundingClientRect(), ar=poster.naturalWidth/poster.naturalHeight;
+      const w=Math.min(r.width,r.height*ar), h=w/ar;
+      const bounds={left:r.left+(r.width-w)/2,top:r.top+(r.height-h)/2,width:w,height:h};
+      const height=2*overviewHalf(selected,ar)/1.025;
+      return projectedLabel(x,y,bounds,{yaw:212,pitch:8.5,targetX:0,targetZ:25.6,width:height*ar,height},selected);
+    }
+    if (canvas.hidden || !canvas.dataset.frameInches) return null;
+    return projectedLabel(x,y,canvas.getBoundingClientRect(),JSON.parse(canvas.dataset.frameInches),selected);
+  }
+  main.addEventListener('pointerdown',e=>{
+    tapped=null;
+    if(e.button!==0 || !e.isPrimary || e.target.closest('a'))return;
+    const id=hitAt(e.clientX,e.clientY);
+    if(labels.has(id))tapped={id,pointer:e.pointerId,x:e.clientX,y:e.clientY};
+  },true);
+  main.addEventListener('pointermove',e=>{
+    if(tapped && e.pointerId===tapped.pointer && Math.hypot(e.clientX-tapped.x,e.clientY-tapped.y)>7)tapped=null;
+    if(e.pointerType==='mouse' && !e.buttons)main.classList.toggle('label-target',labels.has(hitAt(e.clientX,e.clientY)) && !e.target.closest('a'));
+  },true);
+  main.addEventListener('pointerleave',()=>main.classList.remove('label-target'));
+  main.addEventListener('pointercancel',()=>{tapped=null;});
+  main.addEventListener('pointerup',e=>{
+    if(tapped && e.pointerId===tapped.pointer && Math.hypot(e.clientX-tapped.x,e.clientY-tapped.y)<=7)labels.open(tapped.id);
+    tapped=null;
+  },true);
+
   const wowishDownload=document.querySelector('#download-wowish');
   const wowishShelvesURL=wowishDownload.getAttribute('href');
   const wowishShelvesFile=wowishDownload.download;
@@ -213,7 +254,7 @@ function startViewer() {
 
   function staticDrawing(panel,viewBox,detailView=manager.view) {
     const ns='http://www.w3.org/2000/svg';
-    elevation=document.createElementNS(ns,'svg');elevation.id='cabinet-static-art';
+    elevation=document.createElementNS(ns,'svg');elevation.id='cabinet-static-art';elevation.dataset.panel=panel;
     elevation.style.cssText='position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none';
     elevation.setAttribute('role','img');elevation.setAttribute('aria-label',selected+'-inch cabinet, '+manager.view+' view');
     elevation.setAttribute('viewBox',viewBox.join(' '));
@@ -270,7 +311,7 @@ function startViewer() {
     if(view==='rear')return staticDrawing('rear',[0,0,selected,52],'serum');
     if (!photo && view==='overview') {photo=still.rear || art.images.rear;ratio=selected/52;}
     if (!photo && view==='header') {photo=art.images.header;ratio=selected/8;}
-    if (!photo && (view==='left'||view==='right')) {photo=art.images[view];ratio=12/52;}
+    if(view==='left'||view==='right')return staticDrawing(view,[0,0,12,52]);
     if (photo) {
       poster.src=photo;poster.alt=selected+'-inch Original Green cabinet · '+(viewSelect.selectedOptions[0]?.textContent || view);
       if (ratio) {
@@ -303,10 +344,12 @@ function startViewer() {
     viewSelect.value=name;canvas.dataset.view=name;
     showPoster();
   }
+  let cameraAddress=widthFromURL(location.href)+'/'+location.hash;
   function updateURL(width,view) {
     const url=new URL(location.href);url.searchParams.set('size',width);
     if (view!==undefined) url.hash=hashFor[view] || '';
     if (url.href!==location.href) history.pushState(null,'',url);
+    cameraAddress=width+'/'+url.hash;
   }
   function fallback() {
     staticMode=true;loaded=0;manager.spinning=false;manager.current=null;
@@ -354,6 +397,8 @@ function startViewer() {
   viewSelect.addEventListener('change',()=>{updateURL(selected,viewSelect.value);chooseView(viewSelect.value);});
   function followLocation() {
     const width=widthFromURL(location.href),view=links[location.hash]||'overview';
+    if(cameraAddress===width+'/'+location.hash)return;
+    cameraAddress=width+'/'+location.hash;
     if (width!==selected) {manager.view=view;viewSelect.value=view;changeSize(width);}
     else if (manager.view!==view) chooseView(view,true);
   }
@@ -422,7 +467,7 @@ function startViewer() {
     const maxAniso=af?Math.min(8,gl.getParameter(af.MAX_TEXTURE_MAX_ANISOTROPY_EXT)):0;
     const viewportLimits=gl.getParameter(gl.MAX_VIEWPORT_DIMS);
     const renderbufferLimit=gl.getParameter(gl.MAX_RENDERBUFFER_SIZE);
-    let model=null,objects=new Map(),frame=0,last=0;
+    let model=null,objects=new Map(),frame=0,last=0,labelHeldAt=0;
     // A named close-up and a manual camera zoom may cover different regions on the same face.
     function detailLayer(datasetKey) {
       let requested=null,active=null,revision=0;
@@ -516,7 +561,7 @@ function startViewer() {
       gl.drawArrays(gl.TRIANGLES,0,n);
     }
     function drawFrame(t) {
-      frame=0;if(!model||canvas.hidden||document.hidden)return;
+      frame=0;if(!model||canvas.hidden||document.hidden||labels.isOpen())return;
       const dt=last?Math.min((t-last)/1000,.15):0;last=t;const m=manager;
       const transitioning=Boolean(m.current);
       if(m.current) {
@@ -591,6 +636,11 @@ function startViewer() {
         hiddenAt=0;invalidate();
       }
     });
+    function holdLabels(open){
+      if(open){labelHeldAt=performance.now();return;}
+      if(labelHeldAt && manager.current)manager.current.start+=performance.now()-Math.max(labelHeldAt,manager.current.start);
+      labelHeldAt=0;last=0;invalidate();
+    }
     function canRotate(){return orbitViews.has(manager.view)||!manager.view;}
     function applyRotation(){
       manager.spinning=canRotate()&&(rotationChoice??!reduced.matches);
@@ -636,9 +686,11 @@ function startViewer() {
     canvas.addEventListener('wheel',e=>{e.preventDefault();zoom(Math.exp(-clamp(e.deltaY,-150,150)*.0018));},{passive:false});
     const points=new Map();let span=0;
     function gap(){const [a,b]=points.values();return Math.hypot(a.x-b.x,a.y-b.y);}
-    canvas.onpointerdown=e=>{canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);stop();points.set(e.pointerId,{x:e.clientX,y:e.clientY});if(points.size===2)span=gap();};
+    canvas.onpointerdown=e=>{canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);if(!tapped)stop();points.set(e.pointerId,{x:e.clientX,y:e.clientY});if(points.size===2)span=gap();};
     canvas.onpointermove=e=>{
-      const old=points.get(e.pointerId);if(!old)return;points.set(e.pointerId,{x:e.clientX,y:e.clientY});
+      const old=points.get(e.pointerId);if(!old || tapped)return;
+      if(manager.view || manager.spinning || manager.current)stop();
+      points.set(e.pointerId,{x:e.clientX,y:e.clientY});
       if(points.size===2){const next=gap();if(span>0&&next>0)manager.zoom=clamp(manager.zoom*next/span,.68,12);span=next;}
       else if(points.size===1){manager.yaw-=(e.clientX-old.x)*.4;manager.pitch=clamp(manager.pitch+(e.clientY-old.y)*.28,1,62);}
       update();
@@ -652,7 +704,7 @@ function startViewer() {
       }else return;e.preventDefault();
     };
     // Film renderer injection point.
-    return {load,view,render,resize,invalidate,contextLost:()=>gl.isContextLost()};
+    return {load,view,render,resize,invalidate,holdLabels,contextLost:()=>gl.isContextLost()};
   }
 
   viewSelect.value=manager.view;canvas.dataset.view=manager.view;
