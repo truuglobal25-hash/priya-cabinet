@@ -1,5 +1,5 @@
 'use strict';
-importScripts('./files.js?v=shelf-scale-8f783d65');
+importScripts('./files.js?v=shelf-scale-019b8074f3');
 const scope = new URL('./', self.registration.scope);
 const base = new URL('../', scope);
 self.addEventListener('install', event => event.waitUntil(self.skipWaiting()));

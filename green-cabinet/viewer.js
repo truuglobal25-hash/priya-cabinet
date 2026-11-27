@@ -81,6 +81,11 @@ function viewPose(name,width,aspect,art) {
   const crop=art.details?.[name];
   if (crop && ['streax-colours','streax-serums','buds-powders','buds-teas','wowish-washes','wowish-oils','soft-sun','soft-shelf'].includes(name)) {
     const [x,y,w,h]=crop.rect;
+    if (name==='soft-shelf') {
+      const pose=fixed(90,0,52-y-h/2,h/2+.05,w/2+.05);
+      pose.offsetY=x+w/2-6;
+      return pose;
+    }
     return fixed(crop.face==='left'?270:90,0,52-y-h/2,h/2+.09,Math.max(x+w-6,6-x)+.1);
   }
   if (name==='header') return fixed(0,0,48,4.34,width/2+.28);
@@ -189,7 +194,7 @@ function startViewer() {
     const filename = 'Yusuf-Overseas-Green-Cabinet-' + selected + 'in';
     document.querySelector('#download-film').download = filename + '-4K.mp4';
     const artworkDownload = document.querySelector('#download-art');
-    artworkDownload.href = './green-cabinet/cabinet-' + selected + '-rear-4k.png?v=8f783d65087d';
+    artworkDownload.href = './green-cabinet/cabinet-' + selected + '-rear-4k.png?v=019b8074f315';
     artworkDownload.download = filename + '-Rear-4K.png';
     const panels = document.querySelector('#download-panels');
     panels.href = './4k-panels/?size=' + selected + '&download=1';
@@ -203,7 +208,7 @@ function startViewer() {
     if (manager.view==='soft-shelf' || manager.view==='wowish-washes') {
       const main=canvas.parentElement, w=main.clientWidth, h=main.clientHeight;
       const [, , width, height] = currentArt().details[manager.view].rect;
-      const ratio=(width+.2)/(height+.18);
+      const ratio=manager.view==='soft-shelf' ? (width+.1)/(height+.1) : (width+.2)/(height+.18);
       const vertical=Math.max(0,Math.round((h-w/ratio)/2));
       const horizontal=Math.max(0,Math.round((w-h*ratio)/2));
       clip='inset('+vertical+'px '+horizontal+'px)';
@@ -343,6 +348,7 @@ function startViewer() {
     const crop=art.details?.[view];
     if (crop && ['streax-colours','streax-serums','buds-powders','buds-teas','wowish-washes','wowish-oils','soft-sun','soft-shelf'].includes(view)) {
       const [x,y,w,h]=crop.rect;
+      if (view==='soft-shelf') return staticDrawing(crop.face,[x-.05,y-.05,w+.1,h+.1],view);
       return staticDrawing(crop.face,[x-.1,y-.09,w+.2,h+.18],view);
     }
     const left=view==='streax'||view==='skincare';
