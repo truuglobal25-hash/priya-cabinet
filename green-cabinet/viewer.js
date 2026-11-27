@@ -64,7 +64,7 @@ function cabinetGeometry(width) {
 function viewPose(name,width,aspect,art) {
   const base=overviewHalf(width,aspect);
   const fixed=(yaw,pitch,aim,halfHeight,halfWidth) => ({
-    yaw,pitch,aim,offsetX:0,zoom:base/Math.max(halfHeight,halfWidth/aspect)
+    yaw,pitch,aim,offsetX:0,offsetY:0,zoom:base/Math.max(halfHeight,halfWidth/aspect)
   });
   const rearBrand={'rear-streax':'streax','rear-powders':'buds',serum:'wowish','rear-soft':'soft'}[name];
   if (rearBrand) {
@@ -91,7 +91,7 @@ function viewPose(name,width,aspect,art) {
       {streax:36.4,buds:36.35,skincare:12.75,soft:12.75}[name],12.2,6.45);
   }
   const [yaw,pitch]={front:[-9,5],rear:[180,2],overview:[212,7]}[name] || [212,7];
-  return {yaw,pitch,aim:26,offsetX:0,zoom:1};
+  return {yaw,pitch,aim:26,offsetX:0,offsetY:0,zoom:1};
 }
 
 function startViewer() {
@@ -110,6 +110,22 @@ function startViewer() {
   const aspect=()=>Math.max(.1,canvas.parentElement.clientWidth/Math.max(1,canvas.parentElement.clientHeight));
 
   const main=canvas.parentElement;
+  const ink=createCabinetInk(main,canvas);
+  function posterFrame() {
+    if(poster.hidden || poster.dataset.view!=='overview' || !poster.complete || !poster.naturalWidth)return null;
+    const r=poster.getBoundingClientRect(), ar=poster.naturalWidth/poster.naturalHeight;
+    const w=Math.min(r.width,r.height*ar), h=w/ar, height=2*overviewHalf(selected,ar)/1.025;
+    return {bounds:{left:r.left+(r.width-w)/2,top:r.top+(r.height-h)/2,width:w,height:h},
+            frame:{yaw:212,pitch:8.5,targetX:0,targetY:0,targetZ:25.6,width:height*ar,height}};
+  }
+  function paintFlatInk() {
+    if(elevation) { ink.elevation(selected,elevation); return; }
+    const entry=posterFrame();
+    if(entry) ink.model(selected,entry.frame,poster,entry.bounds);
+    else ink.hide();
+  }
+  const flatZoom=staticCabinetZoom(main,minus,plus,()=>staticMode,()=>elevation || poster,paintFlatInk);
+  poster.addEventListener('load',()=>{if(!poster.hidden)paintFlatInk();});
   const labels=startLabelViewer(open=>renderer?.holdLabels(open));
   let tapped=null;
   function hitAt(x,y) {
@@ -122,13 +138,8 @@ function startViewer() {
       return labelAt(elevation.dataset.panel,p.x,p.y,selected);
     }
     if (!poster.hidden) {
-      if (poster.dataset.view!=='overview' || !poster.complete || !poster.naturalWidth) return null;
-      // The poster is the first, uncropped 2160 × 3840 frame of the cabinet turntable.
-      const r=poster.getBoundingClientRect(), ar=poster.naturalWidth/poster.naturalHeight;
-      const w=Math.min(r.width,r.height*ar), h=w/ar;
-      const bounds={left:r.left+(r.width-w)/2,top:r.top+(r.height-h)/2,width:w,height:h};
-      const height=2*overviewHalf(selected,ar)/1.025;
-      return projectedLabel(x,y,bounds,{yaw:212,pitch:8.5,targetX:0,targetZ:25.6,width:height*ar,height},selected);
+      const entry=posterFrame();
+      return entry?projectedLabel(x,y,entry.bounds,entry.frame,selected):null;
     }
     if (canvas.hidden || !canvas.dataset.frameInches) return null;
     return projectedLabel(x,y,canvas.getBoundingClientRect(),JSON.parse(canvas.dataset.frameInches),selected);
@@ -183,7 +194,7 @@ function startViewer() {
     artworkDownload.download = filename + '-Rear-4K.png';
     const panels = document.querySelector('#download-panels');
     panels.href = './4k-panels/?size=' + selected + '&download=1';
-    panels.setAttribute('aria-label', 'Download all six 4K panels for the ' + selected + '-inch cabinet');
+    panels.setAttribute('aria-label', 'Download 4K panels and the print PDF for the ' + selected + '-inch cabinet');
     Object.assign(canvas.dataset,{cabinetWidth:String(selected),cabinetHeight:'52',cabinetDepth:'12'});
     document.dispatchEvent(new CustomEvent('cabinet-size-change',{bubbles:true,detail:{width:selected,depth:12,height:52}}));
   }
@@ -286,7 +297,7 @@ function startViewer() {
       photo('toe',.5,49,selected-1,3);
     }
     clipToShelf(elevation);
-    poster.after(elevation);poster.hidden=true;
+    poster.after(elevation);poster.hidden=true;paintFlatInk();
   }
 
   function removeElevation() {
@@ -294,6 +305,7 @@ function startViewer() {
   }
   function showPoster() {
     removeElevation();
+    ink.hide();
     const requested=currentArt().details?.[manager.view];
     if (!staticMode && loaded===selected && (!requested || canvas.dataset.detailTexture===requested.image)) {
       poster.hidden=true;return;
@@ -318,6 +330,7 @@ function startViewer() {
         const w=Math.min(main.clientWidth,main.clientHeight*ratio);
         Object.assign(poster.style,{width:w+'px',height:w/ratio+'px',margin:'auto',objectFit:'fill'});
       }
+      paintFlatInk();
       return;
     }
     if (view==='front') return staticDrawing('front',[-.4,-1,selected+.8,54]);
@@ -342,7 +355,7 @@ function startViewer() {
     manager.view=name;manager.spinning=false;
     if (renderer) renderer.view(name,immediate);
     viewSelect.value=name;canvas.dataset.view=name;
-    showPoster();
+    showPoster();if(staticMode)flatZoom.reset();
   }
   let cameraAddress=widthFromURL(location.href)+'/'+location.hash;
   function updateURL(width,view) {
@@ -357,8 +370,9 @@ function startViewer() {
     delete canvas.dataset.renderedWidth;delete canvas.dataset.rearTexture;
     canvas.hidden=true;statusNote.hidden=true;
     document.body.classList.remove('viewer-ready');document.body.classList.add('unavailable');
-    const a=document.querySelector('#fallback-film');if(a) a.hidden=!currentArt().film;
-    showPoster();
+    const a=document.querySelector('#fallback-film');
+    if(a){viewSelect.parentElement.append(a);a.hidden=!currentArt().film;}
+    showPoster();flatZoom.reset();
   }
   function presentModel() {
     canvas.hidden=false;poster.hidden=true;statusNote.hidden=true;
@@ -566,7 +580,7 @@ function startViewer() {
       const transitioning=Boolean(m.current);
       if(m.current) {
         const step=clamp((t-m.current.start)/m.current.time,0,1),s=step*step*(3-2*step);
-        for(const k of ['yaw','pitch','zoom','aim','offsetX'])m[k]=m.current.a[k]+(m.current.b[k]-m.current.a[k])*s;
+        for(const k of ['yaw','pitch','zoom','aim','offsetX','offsetY'])m[k]=m.current.a[k]+(m.current.b[k]-m.current.a[k])*s;
         if(step===1)m.current=null;
       }
       if(m.spinning&&!transitioning)m.yaw+=dt*orbitSpeed;
@@ -614,9 +628,12 @@ function startViewer() {
         half=Math.max(half,(projectedWidth/2+.45)/ar);
       }
       gl.uniform3f(u.right,ca,sa,0);gl.uniform3f(u.up,-sa*sp,ca*sp,cp);gl.uniform3f(u.eye,sa*cp,-ca*cp,sp);
-      gl.uniform3f(u.target,m.offsetX,0,m.aim);gl.uniform2f(u.frame,half*ar,half);gl.uniform1f(u.halfWidth,model.width/2);
+      gl.uniform3f(u.target,m.offsetX,m.offsetY,m.aim);gl.uniform2f(u.frame,half*ar,half);gl.uniform1f(u.halfWidth,model.width/2);
       gl.depthMask(false);draw('floor',3);gl.depthMask(true);draw('boards',1);faces.forEach(k=>draw(k,2));
-      canvas.dataset.frameInches=JSON.stringify({width:2*half*ar,height:2*half,targetX:m.offsetX,targetZ:m.aim,yaw:m.yaw,pitch:m.pitch});
+      const cameraFrame={width:2*half*ar,height:2*half,targetX:m.offsetX,targetY:m.offsetY,targetZ:m.aim,yaw:m.yaw,pitch:m.pitch};
+      canvas.dataset.frameInches=JSON.stringify(cameraFrame);
+      if(elevation || !poster.hidden)paintFlatInk();
+      else ink.model(model.width,cameraFrame,canvas,canvas.getBoundingClientRect());
       if(m.spinning||m.current)invalidate();
     }
     function invalidate(){if(!frame&&!document.hidden)frame=requestAnimationFrame(drawFrame);}
@@ -656,7 +673,7 @@ function startViewer() {
       spinButton.disabled=!canRotate();spinButton.textContent=manager.spinning?'Pause':'Rotate';
       spinButton.setAttribute('aria-pressed',String(manager.spinning));
       spinButton.title=spinButton.disabled?'Rotation is available in full-cabinet views':(manager.spinning?'Pause cabinet rotation':'Rotate the cabinet');
-      plus.disabled=manager.zoom>=11.999;minus.disabled=manager.zoom<=.681;invalidate();
+      plus.disabled=manager.zoom>=47.999;minus.disabled=manager.zoom<=.681;invalidate();
     }
     function stop(){removeElevation();rotationChoice=false;manager.current=null;manager.spinning=false;manager.view='';last=0;update();}
     function view(name,immediate=false) {
@@ -671,11 +688,31 @@ function startViewer() {
     function resize(){
       if(manager.view && !manager.current){
         const next=viewPose(manager.view,selected,aspect(),currentArt());
-        Object.assign(manager,{zoom:next.zoom,aim:next.aim,offsetX:next.offsetX});
+        Object.assign(manager,{zoom:next.zoom,aim:next.aim,offsetX:next.offsetX,offsetY:next.offsetY});
       }
       invalidate();
     }
-    function zoom(f){stop();manager.zoom=clamp(manager.zoom*f,.68,12);update();}
+    function zoom(f,from=null,to=from){
+      if(staticMode || !model)return;
+      const r=canvas.getBoundingClientRect();
+      const base=overviewHalf(model.width,aspect());
+      let oldHeight=2*base/manager.zoom;
+      if(manager.view==='left' || manager.view==='right'){
+        const yaw=radians(manager.yaw);
+        oldHeight=Math.max(oldHeight,(Math.abs(Math.cos(yaw))*model.width+Math.abs(Math.sin(yaw))*12+.9)/aspect());
+      }
+      const oldZoom=2*base/oldHeight;
+      const next=clamp(oldZoom*f,.68,48);
+      if(from && r.height){
+        const px=(from.x-r.left-r.width/2)*oldHeight/r.height-(to.x-r.left-r.width/2)*oldHeight*oldZoom/next/r.height;
+        const py=(r.top+r.height/2-from.y)*oldHeight/r.height-(r.top+r.height/2-to.y)*oldHeight*oldZoom/next/r.height;
+        const a=radians(manager.yaw), p=radians(manager.pitch);
+        manager.offsetX+=px*Math.cos(a)-py*Math.sin(a)*Math.sin(p);
+        manager.offsetY+=px*Math.sin(a)+py*Math.cos(a)*Math.sin(p);
+        manager.aim+=py*Math.cos(p);
+      }
+      stop();manager.zoom=next;update();
+    }
     spinButton.onclick=()=>{
       if(!canRotate())return;
       rotationChoice=!manager.spinning;
@@ -683,19 +720,20 @@ function startViewer() {
       applyRotation();update();
     };
     plus.onclick=()=>zoom(1.2);minus.onclick=()=>zoom(1/1.2);
-    canvas.addEventListener('wheel',e=>{e.preventDefault();zoom(Math.exp(-clamp(e.deltaY,-150,150)*.0018));},{passive:false});
-    const points=new Map();let span=0;
-    function gap(){const [a,b]=points.values();return Math.hypot(a.x-b.x,a.y-b.y);}
-    canvas.onpointerdown=e=>{canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);if(!tapped)stop();points.set(e.pointerId,{x:e.clientX,y:e.clientY});if(points.size===2)span=gap();};
+    canvas.addEventListener('wheel',e=>{e.preventDefault();zoom(Math.exp(-clamp(e.deltaY,-150,150)*.0018),{x:e.clientX,y:e.clientY});},{passive:false});
+    const points=new Map();
+    function pinch(){const [a,b]=points.values();return {span:Math.hypot(a.x-b.x,a.y-b.y),mid:{x:(a.x+b.x)/2,y:(a.y+b.y)/2}};}
+    canvas.onpointerdown=e=>{canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);if(!tapped)stop();points.set(e.pointerId,{x:e.clientX,y:e.clientY});if(points.size===2)tapped=null;};
     canvas.onpointermove=e=>{
       const old=points.get(e.pointerId);if(!old || tapped)return;
       if(manager.view || manager.spinning || manager.current)stop();
+      const previous=points.size===2?pinch():null;
       points.set(e.pointerId,{x:e.clientX,y:e.clientY});
-      if(points.size===2){const next=gap();if(span>0&&next>0)manager.zoom=clamp(manager.zoom*next/span,.68,12);span=next;}
+      if(previous){const next=pinch();if(previous.span>0 && next.span>0)zoom(next.span/previous.span,previous.mid,next.mid);}
       else if(points.size===1){manager.yaw-=(e.clientX-old.x)*.4;manager.pitch=clamp(manager.pitch+(e.clientY-old.y)*.28,1,62);}
       update();
     };
-    canvas.onpointerup=canvas.onpointercancel=e=>{points.delete(e.pointerId);span=0;};
+    canvas.onpointerup=canvas.onpointercancel=e=>{points.delete(e.pointerId);};
     canvas.onkeydown=e=>{
       if(e.key==='+'||e.key==='=')zoom(1.2);else if(e.key==='-')zoom(1/1.2);
       else if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){

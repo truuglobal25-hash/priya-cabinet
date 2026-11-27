@@ -20,7 +20,7 @@ function projectedLabel(clientX, clientY, bounds, frame, width) {
   const ca = Math.cos(a), sa = Math.sin(a), cp = Math.cos(p), sp = Math.sin(p);
   const u = ((clientX - bounds.left) / bounds.width - .5) * frame.width;
   const v = (.5 - (clientY - bounds.top) / bounds.height) * frame.height;
-  const x = frame.targetX + u * ca - v * sa * sp, y = u * sa + v * ca * sp;
+  const x = frame.targetX + u * ca - v * sa * sp, y = (frame.targetY || 0) + u * sa + v * ca * sp;
   const z = frame.targetZ + v * cp, dx = sa * cp, dy = -ca * cp;
   const edge = .017;
   const half = width / 2;

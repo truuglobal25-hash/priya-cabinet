@@ -1,65 +1,95 @@
 'use strict';
-(async()=>{
-  const query=new URLSearchParams(location.search);
-  const width=['18','24','36'].includes(query.get('size'))?query.get('size'):'36';
-  const status=document.querySelector('#status'),button=document.querySelector('#download'),progress=document.querySelector('#progress');
-  document.querySelector('#title').textContent=width+'″ cabinet panels in 4K';
-  document.querySelector('a[href="?size='+width+'"]').setAttribute('aria-current','true');
+(async () => {
+  const query = new URLSearchParams(location.search);
+  const width = ['18','24','36'].includes(query.get('size')) ? query.get('size') : '36';
+  const directory = new URL('./', location.href), base = new URL('../', directory);
+  const status = document.querySelector('#status'), progress = document.querySelector('#progress');
+  const zip = document.querySelector('#download'), pdf = document.querySelector('#print-file');
+  const buttons = {zip,pdf};
+  const types = ['zip','pdf'];
+  const files = {};
+  let transfer, skipWorker=false;
+  document.querySelector('#title').textContent = width+'″ cabinet artwork';
+  document.querySelector('nav a[href="?size='+width+'"]').setAttribute('aria-current','true');
   document.querySelector('#back').href='../?size='+width;
-  const bytesHash=async data=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',data)),v=>v.toString(16).padStart(2,'0')).join('');
-  let bundle;
-  async function read(part,signal){
-    for(let n=0;n<3;n++){
-      try{
-        const res=await fetch('./parts/'+part.sha256+'.bin',{cache:n?'reload':'default',signal});
-        if(!res.ok)throw Error();
-        const bytes=await res.arrayBuffer();
-        if(bytes.byteLength!==part.bytes || await bytesHash(bytes)!==part.sha256)throw Error();
-        return bytes;
-      }catch(err){if(signal.aborted||n===2)throw err;}
-    }
+  function busy(active){for (const button of Object.values(buttons)) button.disabled=active;}
+  function state(text){status.textContent=text;}
+  function showProgress(current,total) {
+    if (!transfer) return;
+    progress.hidden=false;progress.max=total;progress.value=current;
+    const percent=Math.floor(current/total*100);
+    if (percent!==transfer.percent){transfer.percent=percent;state(percent+'% downloaded');}
   }
-  async function start(){
-    if(button.disabled)return;
-    button.disabled=true;progress.hidden=false;progress.value=0;status.textContent='Preparing your 4K ZIP…';
-    const controller=new AbortController();
-    try{
-      // All three archives fit within 26 MB, including the largest 36-inch artwork.
-      const list=new Array(bundle.parts.length);
-      progress.max=bundle.bytes;
-      let nextIndex=0;
-      async function readParts(){
-        while(nextIndex<bundle.parts.length && !controller.signal.aborted){
-          const index=nextIndex++;
-          const block=await read(bundle.parts[index],controller.signal);
-          if(controller.signal.aborted)return;
-          list[index]=block;
-          progress.value+=block.byteLength;
-          status.textContent=Math.round(100*progress.value/bundle.bytes)+'% downloaded';
+  function finish(text){transfer=null;busy(false);progress.hidden=true;state(text);}
+  function complete(){finish('Your download is ready.');}
+  async function connect() {
+    if (!navigator.serviceWorker || !isSecureContext) return false;
+    try {
+      await navigator.serviceWorker.register(new URL('file-worker.js',directory), {scope:directory.pathname,updateViaCache:'none'});
+      await Promise.race([navigator.serviceWorker.ready,new Promise((_,reject)=>setTimeout(()=>reject(Error()),6000))]);
+      if (!navigator.serviceWorker.controller) await new Promise(resolve=>{
+        const end=()=>{clearTimeout(timer);navigator.serviceWorker.removeEventListener('controllerchange',end);resolve();};
+        const timer=setTimeout(end,1800);navigator.serviceWorker.addEventListener('controllerchange',end);
+      });
+      return Boolean(navigator.serviceWorker.controller);
+    } catch {return false;}
+  }
+  const connected=connect();
+  navigator.serviceWorker?.addEventListener('message',event=>{
+    const message=event.data;
+    if (!transfer || message?.ticket!==transfer.id) return;
+    if (message.error){skipWorker=true;finish('The download was interrupted. Select the file to try again.');return;}
+    showProgress(message.completed,message.total);
+    if (message.completed===message.total) complete();
+  });
+  async function blobDownload(output, type) {
+    const chunks=[], partial=[];
+    let buffered=0,done=0;
+    for await (const bytes of CabinetFiles.chunks(base,output,0,output.file.bytes)) {
+      // Copy small slices immediately so retained views cannot pin many 16 MiB sources.
+      partial.push(bytes.byteLength < bytes.buffer.byteLength/2 ? bytes.slice() : bytes);
+      buffered+=bytes.byteLength;
+      if (buffered>=1024*1024){chunks.push(new Blob(partial));partial.length=0;buffered=0;}
+      done+=bytes.byteLength;showProgress(done,output.file.bytes);
+    }
+    if (partial.length) chunks.push(new Blob(partial));
+    const blob=new Blob(chunks,{type:type==='pdf'?'application/pdf':'application/zip'});
+    if (blob.size!==output.file.bytes) throw Error('Incomplete download.');
+    const url=URL.createObjectURL(blob), link=document.createElement('a');
+    link.href=url;link.download=output.file.filename;document.body.append(link);link.click();link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),120000);complete();
+  }
+  async function start(type) {
+    if (transfer || !files[type]) return;
+    transfer={id:crypto.randomUUID(),percent:-1};const id=transfer.id;
+    busy(true);progress.hidden=true;state('Preparing your download…');
+    try {
+      const output=files[type], file=output.file;
+      if (!skipWorker && await connected) {
+        const url=new URL('file/'+width+'/'+type+'/'+file.sha256+'/'+file.filename,directory);
+        const head=await fetch(url,{method:'HEAD',cache:'no-store'});
+        if (head.ok&&head.headers.get('X-Content-SHA256')===file.sha256) {
+          url.searchParams.set('ticket',id);
+          const frame=document.createElement('iframe');frame.hidden=true;frame.title='Cabinet file download';
+          frame.src=url.href;document.body.append(frame);state('Starting your download…');
+          setTimeout(()=>{
+            if (transfer?.id===id && transfer.percent<0){skipWorker=true;finish('If your download did not start, select the file to try again.');}
+          },45000);
+          return;
         }
       }
-      const workers=Math.min(4,bundle.parts.length);
-      await Promise.all(Array.from({length:workers},readParts));
-      const zip=new Blob(list,{type:'application/zip'});
-      if(zip.size!==bundle.bytes || await bytesHash(await zip.arrayBuffer())!==bundle.sha256)throw Error();
-      const url=URL.createObjectURL(zip),a=document.createElement('a');
-      a.href=url;a.download=bundle.filename;document.body.append(a);a.click();a.remove();
-      setTimeout(()=>URL.revokeObjectURL(url),60000);
-      status.textContent='Your six-panel ZIP is ready.';button.textContent='Download again';
-    }catch(err){
-      controller.abort();
-      status.textContent='The download was interrupted. Try again.';button.textContent='Try again';
-    }finally{button.disabled=false;progress.hidden=true;}
+      await blobDownload(output,type);
+    } catch {finish('The download was interrupted. Select the file to try again.');}
   }
-  try{
-    const res=await fetch('./manifest.json',{cache:'no-cache'});if(!res.ok)throw Error();
-    bundle=(await res.json())[width];
-    const hex=s=>/^[0-9a-f]{64}$/.test(s);
-    if(bundle.filename!=='Yusuf-Green-Cabinet-'+width+'in-All-Panels-4K.zip' || !hex(bundle.sha256) ||
-       !Array.isArray(bundle.parts)||bundle.parts.some(p=>!Number.isSafeInteger(p.bytes)||p.bytes<1||p.bytes>3*1024*1024||!hex(p.sha256)) ||
-       bundle.parts.reduce((sum,p)=>sum+p.bytes,0)!==bundle.bytes || bundle.bytes>30e6)throw Error();
-    status.textContent='Six full-resolution PNG panels · '+Math.round(bundle.bytes/1e6)+' MB';
-    button.disabled=false;button.addEventListener('click',start);
-    if(query.get('download')==='1')await start();
-  }catch(err){status.textContent='The panel list could not be loaded. Reload this page to try again.';}
+  try {
+    await Promise.all(types.map(async type=>{
+      const output=await CabinetFiles.edition(base,width,type);
+      files[type]=output;
+      buttons[type].textContent=(type==='zip'?'Download 4K ZIP':'Download print PDF')+' · '+Math.round(output.file.bytes/1e6)+' MB';
+      buttons[type].addEventListener('click',()=>start(type));
+    }));
+    busy(false);state('');
+    const requested=query.get('download');
+    if (['1','zip','pdf'].includes(requested)) await start(requested==='pdf'?'pdf':'zip');
+  } catch {state('The download list is unavailable. Reload this page to try again.');}
 })();
