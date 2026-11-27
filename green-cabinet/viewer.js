@@ -180,6 +180,26 @@ function startViewer() {
     return detailBlobs.get(detail.sha256);
   }
 
+  function imageAttemptURL(source,attempt) {
+    if(!attempt)return source;
+    const url=new URL(source,document.baseURI);
+    if(!['http:','https:'].includes(url.protocol))return source;
+    url.searchParams.set('image-retry',String(attempt));
+    return url.href;
+  }
+  const retryDelay=attempt=>300 * 2**(attempt-1);
+  function displayImage(element,source) {
+    let attempt=0;
+    element.addEventListener('error',()=>{
+      if(attempt>=2 || !element.isConnected)return;
+      const next=++attempt;
+      setTimeout(()=>{
+        if(element.isConnected)element.setAttribute('href',imageAttemptURL(source,next));
+      },retryDelay(next));
+    });
+    element.setAttribute('href',source);
+  }
+
   function staticDrawing(panel,viewBox,detailView=manager.view) {
     const ns='http://www.w3.org/2000/svg';
     elevation=document.createElementNS(ns,'svg');elevation.id='cabinet-static-art';
@@ -191,7 +211,8 @@ function startViewer() {
       Object.entries(attrs).forEach(([k,v])=>element.setAttribute(k,v));elevation.append(element);return element;
     }
     function photo(name,x,y,w,h) {
-      shape('image',{href:currentArt().images[name],x,y,width:w,height:h,preserveAspectRatio:'none'});
+      const image=shape('image',{x,y,width:w,height:h,preserveAspectRatio:'none'});
+      displayImage(image,currentArt().images[name]);
     }
     if (panel!=='front') {
       photo(panel,0,0,panel==='left'||panel==='right'?12:selected,52);
@@ -199,9 +220,9 @@ function startViewer() {
       if (detail && detail.face===panel) {
         const [x,y,width,height]=detail.rect;
         const image=shape('image',{x,y,width,height,preserveAspectRatio:'none'});
-        if(!detail.parts)image.setAttribute('href',detail.image);
+        if(!detail.parts)displayImage(image,detail.image);
         else detailURL(detail).then(url=>{
-          if(image.isConnected)image.setAttribute('href',url);
+          if(image.isConnected)displayImage(image,url);
         }).catch(error=>console.warn('Cabinet detail image could not be loaded',error));
       }
     }
@@ -216,8 +237,11 @@ function startViewer() {
     poster.after(elevation);poster.hidden=true;
   }
 
-  function showPoster() {
+  function removeElevation() {
     if (elevation) {elevation.remove();elevation=null;}
+  }
+  function showPoster() {
+    removeElevation();
     if (!staticMode && loaded===selected) {poster.hidden=true;return;}
     const art=currentArt(),view=manager.view || 'overview';
     const still=art.posters || {};
@@ -276,7 +300,8 @@ function startViewer() {
   }
   function presentModel() {
     canvas.hidden=false;poster.hidden=true;statusNote.hidden=true;
-    if(elevation){elevation.remove();elevation=null;}
+    // The serum elevation is already displaying the exact crop while the GPU uploads it.
+    if(manager.view!=='serum' || canvas.dataset.detailTexture===currentArt().details?.serum?.image)removeElevation();
     const film=document.querySelector('#fallback-film');if(film)film.hidden=true;
     canvas.dataset.renderedWidth=String(loaded);canvas.dataset.rearTexture=currentArt().images.rear;
     document.body.classList.remove('unavailable');document.body.classList.add('viewer-ready');
@@ -400,6 +425,8 @@ function startViewer() {
             active={texture,face:next.face,rect:[x/faceWidth,1-(y+h)/52,w/faceWidth,h/52]};
             canvas.dataset[datasetKey]=next.image;
             invalidate();
+            if(datasetKey==='detailTexture' && manager.view==='serum' && !staticMode && loaded===width)
+              requestAnimationFrame(()=>{if(current() && manager.view==='serum')removeElevation();});
           }).catch(error=>{if(current())console.warn('Cabinet detail image could not be loaded',error);});
         }
       };
@@ -407,7 +434,15 @@ function startViewer() {
     const namedDetail=detailLayer('detailTexture'),manualSerum=detailLayer('serumTexture');
     function useDetail(view){namedDetail.set(currentArt().details?.[view]||null);}
     async function fetchTexture(url,current) {
-      const im=new Image();im.src=url;await im.decode();if(!current())return null;
+      let im;
+      for(let attempt=0;attempt<3;attempt++){
+        if(attempt)await new Promise(done=>setTimeout(done,retryDelay(attempt)));
+        if(!current())return null;
+        im=new Image();im.src=imageAttemptURL(url,attempt);
+        try {await im.decode();break;}
+        catch(error){if(attempt===2)throw error;}
+      }
+      if(!current())return null;
       let bitmap=im;
       if(Math.max(im.width,im.height)>maximum) {
         bitmap=document.createElement('canvas');const factor=maximum/Math.max(im.width,im.height);
@@ -533,7 +568,7 @@ function startViewer() {
       spinButton.title=spinButton.disabled?'Rotation is available in full-cabinet views':(manager.spinning?'Pause cabinet rotation':'Rotate the cabinet');
       plus.disabled=manager.zoom>=4.999;minus.disabled=manager.zoom<=.681;invalidate();
     }
-    function stop(){rotationChoice=false;manager.current=null;manager.spinning=false;manager.view='';last=0;update();}
+    function stop(){removeElevation();rotationChoice=false;manager.current=null;manager.spinning=false;manager.view='';last=0;update();}
     function view(name,immediate=false) {
       if(!name){update();return;}
       manager.view=name;useDetail(name);applyRotation();
