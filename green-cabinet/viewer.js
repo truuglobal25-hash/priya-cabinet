@@ -331,8 +331,10 @@ function startViewer() {
       vec3 patchColor(vec3 base,sampler2D image,vec4 rect){
         if(rect.z<=0.0)return base;
         vec2 uv=(tex-rect.xy)/rect.zw;
-        if(any(lessThan(uv,vec2(0.0))) || any(greaterThan(uv,vec2(1.0))))return base;
-        return texture2D(image,uv).rgb;
+        // Sample on both sides of the boundary so mip filters have valid derivatives.
+        vec3 detailColor=texture2D(image,uv).rgb;
+        vec2 edge=min(uv,vec2(1.0)-uv);
+        return mix(base,detailColor,smoothstep(.001,.002,min(edge.x,edge.y)));
       }
       void main(){
         if(kind>2.5){vec2 f=vec2((point.x-1.)/(halfWidth+3.),(point.y-1.)/8.);gl_FragColor=vec4(.25,.24,.19,.20*exp(-1.5*dot(f,f)));return;}
