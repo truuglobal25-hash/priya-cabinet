@@ -13,7 +13,7 @@ globalThis.CabinetFiles = (() => {
   async function edition(base, width, type) {
     if (!['18','24','36'].includes(width) || !['zip','pdf'].includes(type)) throw Error('Unknown cabinet download.');
     if (!manifestPromise) {
-      manifestPromise = fetch(new URL('print-files/recipes/manifest.json?edition=019b8074f3', base), {cache:'no-cache'}).then(response => {
+      manifestPromise = fetch(new URL('print-files/recipes/manifest.json?edition=b7e512175e', base), {cache:'no-cache'}).then(response => {
         if (!response.ok) throw Error('The cabinet download list is unavailable.');
         return response.json();
       }).catch(error => {manifestPromise = null; throw error;});

@@ -194,7 +194,7 @@ function startViewer() {
     const filename = 'Yusuf-Overseas-Green-Cabinet-' + selected + 'in';
     document.querySelector('#download-film').download = filename + '-4K.mp4';
     const artworkDownload = document.querySelector('#download-art');
-    artworkDownload.href = './green-cabinet/cabinet-' + selected + '-rear-4k.png?v=019b8074f315';
+    artworkDownload.href = './green-cabinet/cabinet-' + selected + '-rear-4k.png?v=' + (selected === 18 ? '2128b0168718' : '019b8074f315');
     artworkDownload.download = filename + '-Rear-4K.png';
     const panels = document.querySelector('#download-panels');
     panels.href = './4k-panels/?size=' + selected + '&download=1';
